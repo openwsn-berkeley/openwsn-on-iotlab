@@ -1,0 +1,11 @@
+#!/bin/bash
+
+python --version
+scons --version
+
+source ~/venv/bin/activate
+
+pwd
+python --version
+scons --version
+ping google.com
