@@ -7,4 +7,4 @@ git pull
 scons board=wsn430v14 toolchain=mspgcc noadaptivesync=1 oos_openwsn
 scons board=wsn430v14 toolchain=mspgcc noadaptivesync=1 dagroot=1 oos_openwsn
 
-experiment-cli info --site rennes -li
+python python-helper.py
