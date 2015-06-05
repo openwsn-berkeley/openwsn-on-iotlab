@@ -19,7 +19,7 @@ import subprocess
         
 def main():
     nodes_info=subprocess.check_output(['experiment-cli','info','--site','rennes','-li'])
-    nodes_alive=nodes_info['items'][0]['rennes']['wsn430']['Alive']
+    nodes_alive=eval(nodes_info)['items'][0]['rennes']['wsn430']['Alive']
     print nodes_alive
     
 #============================ main ============================================
