@@ -18,6 +18,7 @@ import subprocess
     # f.write('python openVisualizerWeb.py --port 1234 --iotlabmotes '+','.join(nodes))
         
 def main():
+    print 'checking nodes available'
     nodes_info=subprocess.check_output(['experiment-cli','info','--site','rennes','-li'])
     nodes_alive=eval(nodes_info)['items'][0]['rennes']['wsn430']['Alive']
     nodes_alive=reduce(lambda x,y:x+y,[range(int(nodes_consecutive.split('-')[0]),int(nodes_consecutive.split('-')[-1])+1) for nodes_consecutive in nodes_alive.split('+')])
@@ -32,12 +33,14 @@ def main():
         for i in xrange(factor_int-1):
             if nodes_alive:
                 nodes_alive.pop(0)
-    nodes_to_reserve_string='+'.join(nodes_selected)
-    firmware_path='~/openwsn/openwsn-fw/build/ws430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex'
-    experiment_id=subprocess.check_output(['experiment-cli','submit','-n','minimaltest','-d','30','rennes,wsn430,{0},{1}'.format(nodes_to_reserve_string,firmware_path)])
+    nodes_to_reserve_string='+'.join([str(node) for node in nodes_selected])
+    firmware_path='~/openwsn/openwsn-fw/build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex'
+    print 'reserving nodes'
+    experiment_id=subprocess.check_output(['experiment-cli','submit','-n','minimaltest','-d','30','-l','rennes,wsn430,{0},{1}'.format(nodes_to_reserve_string,firmware_path)])
     experiment_id=eval(experiment_id)['id']
-    subprocess.check_output(['experiment-cli','get','-i','{}'.format(experiment_id]))
-    print 'experiment running'
+    print 'waiting experiment to start', experiment_id
+    subprocess.check_output(['experiment-cli','wait','-i','{}'.format(experiment_id)])
+    print 'experiment running', experiment_id
     print
     
 #============================ main ============================================
