@@ -20,18 +20,18 @@ import subprocess
 def main():
     nodes_info=subprocess.check_output(['experiment-cli','info','--site','rennes','-li'])
     nodes_alive=eval(nodes_info)['items'][0]['rennes']['wsn430']['Alive']
-    nodes_alive=reduce(lambda x+y:x+y,[range(int(nodes_consecutive.split('-')[0]),int(nodes_consecutive.split('-')[-1])+1) for nodes_consecutive in nodes_alive.split('+')])
+    nodes_alive=reduce(lambda x,y:x+y,[range(int(nodes_consecutive.split('-')[0]),int(nodes_consecutive.split('-')[-1])+1) for nodes_consecutive in nodes_alive.split('+')])
     len_nodes_alive=len(nodes_alive)
     print nodes_alive
     print len_nodes_alive
-    factor=len_nodes_alive/50.0
+    factor=len_nodes_alive/100.0
     nodes_selected=[]
     factor_diff=0
     while nodes_alive:
         nodes_selected+=[nodes_alive.pop(0)]
-        factor_int = int(factor+factor_diff)
-        factor_diff = factor - factor_int
-        for i in xrange(factor_int)
+        factor_int = int(factor + factor_diff)
+        factor_diff = factor + factor_diff - factor_int
+        for i in xrange(factor_int-1):
             if nodes_alive:
                 nodes_alive.pop(0)
     print nodes_selected
