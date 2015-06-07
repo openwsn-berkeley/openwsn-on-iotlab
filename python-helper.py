@@ -1,22 +1,9 @@
 #!/usr/bin/python
 
-#import os
+import os
 #import sys
 import subprocess
 
-# groups = [group for group in sys.argv[1].split('+')]
-# nodes = []
-# for group in groups:
-    # nodes_temp = group.split('-')
-    # if len(nodes_temp) == 1:
-        # nodes+=['wsn430-'+nodes_temp[0]]
-    # elif len(nodes_temp) == 2:
-        # for node in range(int(nodes_temp[0]), int(nodes_temp[1])+1):
-            # nodes+=['wsn430-'+str(node)]
-# print len(nodes)
-# with open('change.txt','w') as f:
-    # f.write('python openVisualizerWeb.py --port 1234 --iotlabmotes '+','.join(nodes))
-        
 def main():
     print '+--------------------------------------+'
     print '|      checking available nodes        |'
@@ -25,7 +12,7 @@ def main():
     nodes_alive=eval(nodes_info)['items'][0]['rennes']['wsn430']['Alive']
     nodes_alive=reduce(lambda x,y:x+y,[range(int(nodes_consecutive.split('-')[0]),int(nodes_consecutive.split('-')[-1])+1) for nodes_consecutive in nodes_alive.split('+')])
     len_nodes_alive=len(nodes_alive)
-    factor=len_nodes_alive/100.0
+    factor=len_nodes_alive/30.0
     nodes_selected=[]
     factor_diff=0
     while nodes_alive:
@@ -49,8 +36,7 @@ def main():
     print '+--------------------------------------+'
     print '|       running Openvisualizer         |'
     print '+--------------------------------------+'
-    subprocess.call(['cd','~/openwsn/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/'])
-    subprocess.call(['python','openVisualizerWeb.py','--port','1234','--iotlabmotes','+'.join([str(node) for node in nodes_selected])])
+    subprocess.call(['python','~/openwsn/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/openVisualizerWeb.py','--port','1234','--iotlabmotes','+'.join([str(node) for node in nodes_selected])])
     print '+--------------------------------------+'
     print '|          delete experiment           |'
     print '+--------------------------------------+'
