@@ -32,11 +32,11 @@ def main():
     print '+--------------------------------------+'
     print '|     waiting to start experiment      |'
     print '+--------------------------------------+'
-    subprocess.call(['experiment-cli','wait','-i','{}'.format(experiment_id)])
+    output=subprocess.check_output(['experiment-cli','wait','-i','{}'.format(experiment_id)])
     print '+--------------------------------------+'
     print '|       running Openvisualizer         |'
     print '+--------------------------------------+'
-    subprocess.call(['python','~/openwsn/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/openVisualizerWeb.py','--port','1234','--iotlabmotes','+'.join([str(node) for node in nodes_selected])])
+    subprocess.call(['python','openVisualizerWeb.py','--port','1234','--iotlabmotes',','.join(['wsn430-'+str(node) for node in nodes_selected])])
     print '+--------------------------------------+'
     print '|          delete experiment           |'
     print '+--------------------------------------+'
