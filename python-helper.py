@@ -63,9 +63,9 @@ def main():
     print
     nodes_info=subprocess.check_output(['experiment-cli','info','--site',args.site,'-li'])
     nodes_alive = eval(nodes_info)['items'][0]['rennes']['wsn430']['Alive']
-    nodes_alive = reduce(lambda x,y:x+y, \
+    nodes_alive = reduce(lambda x,y:x+y,
                          [range(int(group.split('-')[0]),int(group.split('-')[-1])+1) for group in nodes_alive.split('+')])
-    nodes_alive = list(set(nodes_alive)-nodes_not_working
+    nodes_alive = list(set(nodes_alive).difference(nodes_not_working))
     nodes_selected=[]
     if args.closeMotes:
         nodes_selected = nodes_alive[:args.moteNumber]
@@ -90,15 +90,19 @@ def main():
     print '|          reserving nodes             |'
     print '+--------------------------------------+'
     print
-    
+    print type(args.site)
+    print type(nodes_to_reserve_string)
+    print type(firmware_path)
+    print type('{0},wsn430,{1},{2}'.format(args.site,nodes_to_reserve_string,firmware_path))
     experiment_id = subprocess.check_output(['experiment-cli','submit',
                                              '-n',args.name,
                                              '-d',args.duration,
-                                             '-r',args.reservation,
-                                             '-p',args.print_json,
+                                             #'-r',args.reservation,
+                                             #'-p',args.print_json,
+                                             '-l','{0},wsn430,{1},{2}'.format(args.site,nodes_to_reserve_string,firmware_path)]) 
                                              #'-l','{0},wsn430,{1},{2}'.format(args.site,dagroot_to_reserve_string,firmware_dagroot_path),
-                                             '-l','{0},wsn430,{1},{2}'.format(args.site,nodes_to_reserve_string,firmware_path),
-                                             ])
+                                             #'-l','{0},wsn430,{1},{2}'.format(args.site,nodes_to_reserve_string,firmware_path),
+                                             #])
     experiment_id = eval(experiment_id)['id']
     
     print '+--------------------------------------+'

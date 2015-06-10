@@ -16,5 +16,7 @@ echo '+--------------------------------------+'
 echo '|        Starting python script        |'
 echo '+--------------------------------------+'
 echo ''
+cd ~/openwsn/openwsn-sw
+git clean -fX
 cd ~/openwsn/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/
 python ~/openwsn/scripts-iotlab/python-helper.py $@
