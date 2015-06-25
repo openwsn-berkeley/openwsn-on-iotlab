@@ -4,19 +4,646 @@ import threading
 import argparse
 import socket
 import json
+import signal
+import time
 
 MOTETYPE            = 'wsn430'
-MOTENAMEPREAMBLE    = MOTETYPE + '-'
-FW                  = '~/openwsn/openwsn-fw/build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex'
-FW_DAGROOT          = '~/openwsn/openwsn-fw/build/wsn430v14_mspgcc_dagroot/projects/common/03oos_openwsn_prog.ihex'
-MOTESCHECKED        = 'motes_checked'
-MOTESKNOWN          = 'mote_known'
-DUMPDIR             = 'RESERVATIONS'
-STARTINGRESERVATION = '.STARTING'
-RUNNINGRESERVATION  = '.RUNNING'
-STOPPINGRESERVATION = '.STOPPING'
-
+FW                  = 'openwsn-fw/build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex'
+FW_DAGROOT          = 'openwsn-fw/build/wsn430v14_mspgcc_dagroot/projects/common/03oos_openwsn_prog.ihex'
 NUMBERMOTES         = 100
+
+class ReservationManagerException(Exception):
+    def __init__(self,err=''):
+        self.err  = err
+    
+    def __str__(self):
+        return str(self.err)
+
+class ReservationStopping(ReservationManagerException):
+    def __str__(self):
+        return '\nRESERVATION STOPPING: ' + ReservationManagerException.__str__(self)
+
+class ReservationSelfStopping(ReservationManagerException):
+    def __str__(self):
+        return '\nRESERVATION SELF STOPPING: ' + ReservationManagerException.__str__(self)
+
+class ReservationContinuing(ReservationManagerException):
+    def __str__(self):
+        return '\nRESERVATION CONTINUING: ' + ReservationManagerException.__str__(self)
+
+class ExperimentTerminating(ReservationManagerException):
+    def __str__(self):
+        return '\nEXPERIMENT TERMINATING: ' + ReservationManagerException.__str__(self)
+
+class ExperimentSelfTerminating(ReservationManagerException):
+    def __str__(self):
+        return '\nEXPERIMENT SELF TERMINATING: ' + ReservationManagerException.__str__(self)
+
+class CommandError(ReservationManagerException):
+    def __str__(self):
+        return '\nCOMMAND ERROR: ' + ReservationManagerException.__str__(self)
+
+class Reservation(threading.Thread):
+    DUMPDIR                 = 'RESERVATIONS'
+    STARTING_PREAMBLE       = '.STARTING'
+    STOPPING_PREAMBLE       = '.STOPPING'
+    ONGOING_PREAMBLE        = '.ONGOING'
+    RUNNING_PREAMBLE        = '.RUNNING'
+    TERMINATING_PREAMBLE    = '.TERMINATING'
+    UPDATING_PREAMBLE       = '.UPDATING'
+    MOTESCHECKED_PREAMBLE   = 'motes_checked'
+    MOTESKNOWN_PREAMBLE     = 'mote_known'
+    RESERVATION_GUARDTIME   = 600 # 10 minutes of guard time from the estimated end of the reservation
+    
+    def __init__(self,args):
+        self.__args = args
+        dict_start_functions = {
+                        'start':        self.__reservation_start,
+                        'stop':         self.__reservation_stop,
+                        'run':          self.__openvisualizer_run,
+                        'terminate':    self.__openvisualizer_terminate,
+                        }
+        dict_stop_functions = {
+                        'start':        self.__reservation_stop,
+                        'stop':         self.__dummy,
+                        'run':          self.__openvisualizer_terminate,
+                        'terminate':    self.__dummy,
+                        }
+        self.run = dict_start_functions[self.__args.command]
+        self.stop = dict_stop_functions[self.__args.command]
+        
+        self.__working_directory    = os.getcwd()
+        self.__dump_directory       = os.path.join(self.__working_directory,self.DUMPDIR)
+        if not os.path.exists(self.__dump_directory):
+            os.makedirs(self.__dump_directory)
+        self.__file_firmware_regular    = os.path.join(self.__working_directory,'..',FW)
+        self.__file_firmware_dagroot    = os.path.join(self.__working_directory,'..',FW_DAGROOT)
+        self.__file_starting            = os.path.join(self.__working_directory,self.STARTING_PREAMBLE + self.__args.site)
+        self.__file_stopping            = os.path.join(self.__working_directory,self.STOPPING_PREAMBLE + self.__args.site)
+        self.__file_ongoing             = os.path.join(self.__working_directory,self.ONGOING_PREAMBLE + self.__args.site)
+        self.__file_running             = os.path.join(self.__working_directory,self.RUNNING_PREAMBLE + self.__args.site)
+        self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING_PREAMBLE + self.__args.site)
+        self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING_PREAMBLE + self.__args.site)
+        self.__reset_variables()
+        self.__goOn = False
+        self.__prepare()
+        threading.Thread.__init__(self)
+    
+    #-------------------self.run AND self.stop METHODS-------------------#
+    
+    def __reservation_start(self):
+        
+        # This method is called by a start command
+        
+        if not self.__goOn:
+            return
+
+        self.__set_starting()
+        
+        try:
+            if self.__args.update:
+                self.__update_openwsn()
+            while True:
+                self.__reservation_start_header()
+                try:
+                    self.__reservation_start_body()
+                except ReservationContinuing as e:
+                    print e
+                    # Exception raised to continue in trying another reservation in the cascade reservation process
+                    self.__reservation_stop_body()
+                else:
+                    # The cascade reservation process is ok, so exit the loop
+                    break
+        except (ReservationStopping,ReservationSelfStopping,CommandError) as e:
+            print e
+            if not self.__is_stopping():
+                self.__set_stopping()
+        
+        if self.__is_stopping():
+            self.__clear_starting()
+            self.__reservation_stop_body()
+            self.__clear_stopping()
+        else:
+            self.__set_ongoing()
+            self.__clear_starting()
+        
+    def __reservation_stop(self):
+    
+        # This method is called by a stop command or when pressing Ctrl-C when a start command is running 
+        
+        if not self.__is_stopping():
+            if self.__is_running():
+                self.__set_stopping()
+                print 'STOP SIGNAL SENT TO THE RUNNING EXPERIMENT'
+            elif self.__get_ongoing():
+                print 'A RESERVATION IS ONGOING AND NO EXPERIMENT HAS BEEN DETECTED'
+                self.__set_stopping()
+                if self.__is_updating():
+                    self.__clear_updating()
+                self.__clear_ongoing()
+                if self.__is_reservation_really_running():
+                    self.__reservation_stop_body()
+                self.__clear_stopping()
+                print 'RESERVATION STOPPED'
+            elif self.__is_starting():
+                self.__set_stopping()
+                print 'STOP SIGNAL SENT TO THE STARTING RESERVATION'
+            else:
+                print 'NOTHING TO STOP'
+        else:
+            print 'ALREADY STOPPING THE ONGOING RESERVATION'
+    
+    def __openvisualizer_run(self):
+        
+        # This method is called by a run command
+        
+        if not self.__goOn:
+            return
+        
+        self.__set_running()
+        if self.__args.update:
+            self.__set_updating()
+        update = self.__is_updating()
+        reservation_not_running = False
+        try:
+            if not self.__is_reservation_really_running():
+                raise ReservationSelfStopping('No reservation running')
+            else:
+                time_remaining = self.__reservation_stopping_time - time.time()
+                if (time_remaining) <= self.GUARDTIME:
+                    raise ReservationSelfStopping('Only {} minutes remaining within this reservation: not sufficient time'.format(time_remaining/60))
+                print '{} minutes remaining within this reservation'.format(time_remaining/60)
+            if update:
+                self.__update_openwsn()
+            self.__openvisualizer_run_header(update)
+            
+            print '\nRunning openVisualizer'
+            os.chdir(os.path.join(self.__working_directory,'..','openwsn-sw','software','openvisualizer','bin','openVisualizerApp'))
+            command = ['python','openVisualizerWeb.py','--port',
+                        '1234','--iotlabmotes',','.join(['{}-{}'.format(MOTETYPE,str(mote)) for mote in self.__motes_selected])]
+            s = subprocess.Popen(command, stdin = subprocess.PIPE, preexec_fn = preexec_function)
+            keyboardinterrupt_flag = False
+            while all([ s.poll()==None, 
+                        not self.__is_terminating(),
+                        not self.__is_stopping(),
+                        (self.__reservation_stopping_time - time.time()) > self.GUARDTIME,
+                        ]):
+                try:
+                    time.sleep(60)
+                except KeyboardInterrupt:
+                    keyboardinterrupt_flag = True
+            s.stdin.write('q\n')
+            s.wait()
+            time_remaining = self.__reservation_stopping_time - time.time()
+            if self.__is_stopping():
+                raise ReservationStopping('Reservation stopped while openVisualizer was running')
+            elif time_remaining <= self.GUARDTIME:
+                raise ReservationSelfStopping('Only {} minutes remaining within this reservation: forced closing of openVisualizer'.format(time_remaining/60))
+            elif self.__is_terminating():
+                self.__clear_terminating()
+                if keyboardinterrupt_flag:
+                    print '\nCtrl-C forced closing openVisualizer'
+                else:
+                    print '\nAnother external process terminated the experiment: openVisualizer closed'
+            else:
+                print '\nOpenVisualizer gracefully stopped itself!'
+            
+            self.__openvisualizer_run_trailer()
+            if self.__is_updating():
+                self.__clear_updating()
+        except (ExperimentTerminating,ExperimentSelfTerminating,CommandError) as e:
+            print e
+            self.__set_updating()
+        except ReservationStopping as e:
+            print e
+        except ReservationSelfStopping as e:
+            print e
+            self.__set_stopping()
+            reservation_not_running = True
+        
+        self.__clear_running()
+        if self.__is_terminating():
+            self.__clear_terminating()
+        if self.__is_stopping():
+            if self.__is_updating():
+                self.__clear_updating()
+            self.__clear_ongoing()
+            if not reservation_not_running:
+                self.__reservation_stop_body()
+            self.__clear_stopping()
+    
+    def __openvisualizer_terminate(self):
+        
+        # This method is called by a terminate command or when pressing Ctrl-C when a run command is running
+        
+        if all([not self.__is_stopping(),self.__is_running()]):
+            self.__set_terminating()
+            print 'TERMINATE SIGNAL SENT TO THE RUNNING EXPERIMENT'
+        else:
+            print 'NO EXPERIMENT TO TERMINATE OR THE RESERVATION IS STOPPING'
+    
+    def __dummy(self):
+        pass
+    
+    #-------------------self.run AND self.stop HELPER METHODS-------------------#
+    
+    def __reservation_start_header(self):
+        
+        # Check motes availability
+        command = ['experiment-cli','info','--site',self.__args.site,'-li']
+        stdout = self.__run_command(command,'Before checking motes availability')
+        motes_dict = json.loads(stdout)['items'][0][self.__args.site][MOTETYPE]
+        if motes_dict.has_key('Alive'):
+            self.__motes_alive = convert_string(motes_dict['Alive'])
+        for state_motes in motes_dict.itervalues():
+            self.__motes_all |= convert_string(state_motes)
+        if self.__args.moteList:
+            self.__motes_alive &= self.__args.moteList
+            self.__motes_all   &= self.__args.moteList
+        print '\n{} motes in total in {}:\n{}'.format(len(self.__motes_all),self.__args.site,convert_set(self.__motes_all))
+        if self.__motes_alive < NUMBERMOTES:
+            raise ReservationSelfStopping('Only {} motes alive'.format(len(self.__motes_alive)))
+        print '\n{} motes alive:\n{}'.format(len(self.__motes_alive),convert_set(self.__motes_alive))
+    
+    def __reservation_start_body(self):
+        
+        # Submit reservation
+        command = ['experiment-cli','submit','-n',self.__args.name,'-d',self.__args.duration,
+                    '-l','{},{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(self.__motes_alive),self.__file_firmware_regular)]
+        stdout = self.__run_command(command,'Before submitting reservation')
+        reservation_id = json.loads(stdout)['id']
+        
+        # Wait for reservation running
+        command = ['experiment-cli','wait','-i','{}'.format(reservation_id)]
+        stdout,stderr = self.__run_command(command,'Before waiting Running state',check_stderr=False)
+        
+        # Get information to compute the reservation stopping time
+        command = ['experiment-cli','get','-l','--state','Running']
+        stdout = self.__run_command(command,'Before getting information about the reservation stopping time')
+        reservation_stopping_time = None
+        for reservation in json.loads(stdout)['items']:
+            if int(reservation['id']) == reservation_id:
+                reservation_stopping_time = float(reservation['date']) + float(reservation['duration'])
+        if reservation_stopping_time == None:
+            raise ReservationSelfStopping('Not able to compute the reservation stopping time')
+        
+        # store information as object attributes
+        self.__set_reservation_id(reservation_id,reservation_stopping_time)
+        print '\nTemporary Reservation ID {}'.format(self.__reservation_id)
+        print 'Reservation stopping in {} minutes'.format((self.__reservation_stopping_time-time.time())/60)
+        
+        # Log to file
+        with open(self.__file_motes_checked,'w') as f:
+            f.write('#ALL {}\n'.format(convert_set(self.__motes_all)))
+            f.write('#ALIVE {}\n'.format(convert_set(self.__motes_alive)))
+        
+        # Check reservation
+        command = ['experiment-cli','get','-p','-i','{}'.format(self.__reservation_id)]
+        stdout = self.__run_command(command,'Before checking reservation')
+        motes_dict = json.loads(stdout)['deploymentresults']
+        if motes_dict.has_key('0'):
+            self.__motes_available = set([int(mote.split('.')[0][len(MOTETYPE)+1:]) for mote in motes_dict['0']])
+        if self.__motes_available < NUMBERMOTES:
+            raise ReservationContinuing('Only {} motes available'.format(self.__motes_available))
+        print '\n{} motes available:\n{}'.format(len(self.__motes_available),convert_set(self.__motes_available))
+        
+        # Log to file
+        with open(self.__file_motes_checked,'a') as f:
+            f.write('#AVAILABLE {}\n'.format(convert_set(self.__motes_available)))
+        
+        # Select those motes passing some tests
+        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_available,'stop')
+        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'start')
+        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'update',self.__file_firmware_regular)
+        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'reset')
+        self.__motes_working = self.__get_motes_reachable(self.__motes_working)
+        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
+        if self.__motes_working < NUMBERMOTES:
+            raise ReservationContinuing('Only {} motes working'.format(self.__motes_working))
+        print '\n{} motes working:\n{}'.format(len(self.__motes_working),convert_set(self.__motes_working))
+        
+        # Log to file
+        with open(self.__file_motes_checked,'a') as f:
+            f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
+        
+        print '\nReservation ID {}'.format(self.__reservation_id)
+    
+    def __reservation_stop_body(self):
+        
+        if self.__reservation_id:
+            command = ['experiment-cli','stop','-i','{}'.format(self.__reservation_id)]
+            self.__run_command(command,check_stderr=False)
+            command = ['experiment-cli','wait','-i','{}'.format(self.__reservation_id),'--state','Error,Terminated']
+            self.__run_command(command,check_stderr=False)
+            self.__reset_variables()
+    
+    def __openvisualizer_run_header(self,update):
+        
+        if update:
+            motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'start')
+            motes_working = self.__send_node_cli_command_to_motes(motes_working,'update',self.__file_firmware_regular)
+            motes_really_working = self.__send_node_cli_command_to_motes(motes_working,'stop')
+            if self.__motes_working - motes_really_working:
+                self.__motes_working = motes_really_working
+                self.__select_motes_to_run()
+        while True:
+            self.__send_node_cli_command_to_motes(self.__motes_selected,'start')
+            self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_dagroot)
+            self.__send_node_cli_command_to_motes(self.__motes_selected,'reset')
+            motes_not_working = self.__motes_selected - self.__get_motes_reachable(self.__motes_selected)
+            
+            # if motes_not_working is empty, the following part will not be executed, and break is reached
+            motes_working_back = self.__send_node_cli_command_to_motes(motes_not_working,'stop')
+            motes_working_back = self.__send_node_cli_command_to_motes(motes_working_back,'start')
+            motes_working_back_regular = self.__send_node_cli_command_to_motes(motes_working_back - self.__dagroot,'update',self.__file_firmware_regular)
+            motes_working_back_dagroot = self.__send_node_cli_command_to_motes(motes_working_back & self.__dagroot,'update',self.__file_firmware_dagroot)
+            motes_working_back = self.__send_node_cli_command_to_motes(motes_working_back_regular | motes_working_back_dagroot,'reset')
+            motes_not_working -= self.__get_motes_reachable(motes_working_back)
+
+            if motes_not_working:
+                self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
+                self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
+                self.__motes_working -= motes_not_working
+                self.__motes_selected = set([])
+                if self.__motes_working >= self.__args.numMotes:
+                    self.__select_motes_to_run()
+                else:
+                    raise ExperimentSelfTerminating('Only {} motes working'.format(len(self.__motes_working)))
+            else:
+                break
+    
+    def __openvisualizer_run_trailer(self):
+        
+        self.__send_node_cli_command_to_motes(self.__dagroot,'start')
+        self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
+        self.__motes_working -= self.__motes_selected - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
+        with open(self.__file_motes_checked,'w') as f:
+            f.write('#ALL {}\n'.format(convert_set(self.__motes_all)))
+            f.write('#ALIVE {}\n'.format(convert_set(self.__motes_alive)))
+            f.write('#AVAILABLE {}\n'.format(convert_set(self.__motes_available)))
+            f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
+        with open(self.__file_motes_known,'w') as f:
+            f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
+            f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))
+    
+    def __update_openwsn(self):
+        
+        os.chdir(os.path.join(self.__working_directory,'..','openwsn-fw'))
+        command = ['git','pull']
+        self.__run_command(command,'Before pulling openwsn-fw')
+        command = ['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','oos_openwsn']
+        self.__run_command(command,'Before compiling regular firmware')
+        command = ['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','dagroot=1','oos_openwsn']
+        self.__run_command(command,'Before compiling dagroot firmware')
+        os.chdir(os.path.join(self.__working_directory,'..','openwsn-sw'))
+        command = ['git','pull']
+        self.__run_command(command,'Before pulling openwsn-sw')
+    
+    def __is_reservation_really_running(self):
+        
+        command = ['experiment-cli','get','-i','{}'.format(self.__reservation_id),'-s']
+        stdout = self.__run_command(command)
+        reservation_state = json.loads(stdout)['state']
+        
+        return reservation_state == 'Running'
+    
+    #-------------------UTILITY METHODS-------------------#
+    
+    def __send_node_cli_command_to_motes(self,motes,op,op_arg=None):
+        motes_successful = set([])
+        if motes:
+            command = ['node-cli','-i','{}'.format(self.__reservation_id),
+                        '-l','{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(motes)),'--{}'.format(op)]
+            if op_arg:
+                command += [op_arg]
+            stdout = self.__run_command(command,'Before node-cli command')
+            motes_dict = json.loads(stdout)
+            if motes_dict.has_key('0'):
+                motes_successful = set([int(mote.split('.')[0][len(MOTETYPE)+1:]) for mote in motes_dict['0']])
+                if motes-motes_successful:
+                    print '{} motes not working ({}):\n{}'.format(len(motes-motes_successful),op,convert_set(motes-motes_successful))
+        return motes_successful
+    
+    def __loop_send_node_cli_command_to_motes(self,motes,op,op_arg=None):
+        motes_failure = motes - self.__send_node_cli_command_to_motes(motes,op,op_arg)
+        while motes_failure:
+            motes_failure -= self.__send_node_cli_command_to_motes(motes_failure,op,op_arg)
+    
+    def __get_motes_reachable(self,motes_to_test):
+        if motes_to_test:
+            print '\nChecking TCP reachability for:\n{}'.format(convert_set(motes_to_test))
+        motes_responding = set([])
+        for mote_n in motes_to_test:
+            error_message = 'While checking reachability'
+            if self.__is_stopping():
+                raise ReservationStopping(error_message)
+            if self.__is_terminating():
+                raise ExperimentTerminating(error_message)
+            mote = '{}-{}'.format(MOTETYPE,str(mote_n))
+            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            sock.connect((mote,20000))
+            sock.settimeout(10)
+            try:
+                data = sock.recv(1024)
+            except socket.timeout:
+                pass
+            else:
+                motes_responding.add(mote_n)
+            sock.close()
+        if motes_to_test-motes_responding:
+            print '{} motes not working (tcp):\n{}'.format(len(motes_to_test-motes_responding),convert_set(motes_to_test-motes_responding))
+        return motes_responding
+    
+    def __run_command(self,input,check_message='',check_stderr=True):
+        if check_message:
+            if self.__is_stopping():
+                raise ReservationStopping(check_message)
+            if self.__is_terminating():
+                raise ExperimentTerminating(check_message)
+        print '\n'+' '.join(input)
+        s = subprocess.Popen(input,stdout=subprocess.PIPE,stderr=subprocess.PIPE,preexec_fn = preexec_function)
+        stdout,stderr = s.communicate()
+        if not check_stderr:
+            return stdout,stderr
+        if stderr:
+           raise CommandError(stderr)
+        return stdout
+    
+    def __select_motes_to_run(self):
+        motes_working = sorted(self.__motes_working)
+        if self.__args.closeFlag:
+            self.__motes_selected = set(motes_working[:self.__args.numMotes])
+        else:
+            factor=float(len(motes_working)-1)/float(self.__args.numMotes-1)
+            factor_diff=0
+            while motes_working:
+                self.__motes_selected.add(motes_working.pop(0))
+                factor_int = int(factor + factor_diff)
+                factor_diff = factor + factor_diff - factor_int
+                motes_working = motes_working[factor_int-1:]
+        motes_selected_sorted = sorted(self.__motes_selected)
+        if self.__args.dagrootCentered:
+            self.__dagroot = set([motes_selected_sorted[len(motes_selected_sorted)/2]])
+        else:
+            self.__dagroot = set([motes_selected_sorted[0]])
+    
+    #-------------------STATE METHODS-------------------#
+    
+    def __prepare(self):
+        if self.__args.command == 'start':
+            if self.__get_ongoing():
+                print 'RESERVATION RUNNING: YOU CANNOT START ANOTHER ONE!'
+                return
+            if self.__is_starting():
+                print 'RESERVATION STARTING: YOU CANNOT START ANOTHER ONE!'
+                return
+            if self.__is_stopping():
+                print 'RESERVATION STOPPING: WAIT!'
+                return
+            self.__goOn = True
+        elif self.__args.command == 'run':
+            if self.__is_stopping():
+                print 'RESERVATION STOPPING: TRY RESTARTING FIRST A RESERVATION!'
+                return
+            if self.__is_starting():
+                print 'RESERVATION STARTING: WAIT!'
+                return
+            if not self.__get_ongoing():
+                print 'NO RESERVATION PRESENT: START A RESERVATION BEFORE RUNNING OPENWSN!'
+                return
+            if self.__is_running() or self.__is_terminating():
+                print 'OPENVISUALIZER RUNNING: YOU CANNOT RUN ANOTHER OPENVISUALIZER PROCESS!'
+                return
+            with open(self.__file_motes_checked) as f:
+                lines = f.readlines()
+            for line in lines:
+                tag, motes = line.strip().split()
+                motes_set = convert_string(motes)
+                if tag == '#ALL':
+                    self.__motes_all = motes_set
+                elif tag == '#ALIVE':
+                    self.__motes_alive = motes_set
+                elif tag == '#AVAILABLE':
+                    self.__motes_available = motes_set
+                elif tag == '#WORKING':
+                    self.__motes_working = motes_set
+            if len(self.__motes_working)<self.__args.numMotes:
+                print 'NO SUFFICIENT MOTES: YOU CANNOT RUN SO MANY MOTES IN THIS RESERVATION!'
+                return
+            newMotesSelectedList = self.__args.anotherMoteList
+            newMotesSelectedList |= (not os.path.isfile(self.__file_motes_known))
+            if not newMotesSelectedList:
+                with open(self.__file_motes_known) as f:
+                    lines = f.readlines()
+                for line in lines:
+                    tag, motes = line.strip().split()
+                    motes_set = convert_string(motes)
+                    if tag == '#SELECTED':
+                        self.__motes_selected = motes_set
+                    elif tag == '#DAGROOT':
+                        self.__dagroot = motes_set
+                if self.__motes_selected - self.__motes_working:
+                    newMotesSelectedList = True
+            if newMotesSelectedList:
+                self.__select_motes_to_run()
+            self.__goOn = True
+    
+    def __reset_variables(self):
+        self.__motes_all = set([])
+        self.__motes_alive = set([])
+        self.__motes_available = set([])
+        self.__motes_working = set([])
+        self.__motes_selected = set([])
+        self.__dagroot = set([])
+        self.__set_reservation_id()
+    
+    def __set_reservation_id(self,reservation_id = None,reservation_stopping_time = None):
+        self.__reservation_id = reservation_id
+        self.__reservation_stopping_time = reservation_stopping_time
+        self.__file_motes_checked = None
+        self.__file_motes_known = None
+        if reservation_id:
+            self.__file_motes_checked = os.path.join(self.__dump_directory,self.MOTESCHECKED_PREAMBLE+'_{}.txt'.format(reservation_id))
+            if all(k in self.__args.__dict__ for k in ('numMotes','closeFlag')):
+                density = 'far'
+                if self.__args.closeFlag:
+                    density = 'close'
+                self.__file_motes_known = os.path.join(self.__dump_directory,
+                                        self.MOTESKNOWN_PREAMBLE+'_{}_{}_{}.txt'.format(reservation_id,self.__args.numMotes,density))
+    
+    def __is_starting(self):
+        return os.path.isfile(self.__file_starting)
+    
+    def __set_starting(self):
+        with open(self.__file_starting,'w') as f:
+            f.write('')
+    
+    def __clear_starting(self):
+        os.remove(self.__file_starting)
+    
+    def __is_stopping(self):
+        return os.path.isfile(self.__file_stopping)
+    
+    def __set_stopping(self):
+        with open(self.__file_stopping,'w') as f:
+            f.write('')
+    
+    def __clear_stopping(self):
+        os.remove(self.__file_stopping)
+    
+    def __get_ongoing(self):
+        toReturn = os.path.isfile(self.__file_ongoing)
+        if toReturn:
+            reservation_id = None
+            reservation_stopping_time = None
+            with open(self.__file_ongoing) as f:
+                lines = f.readlines()
+                for line in lines:
+                    tag, value = line.strip().split()
+                    if tag == '#RESERVATIONID':
+                        reservation_id = int(value)
+                    elif tag == '#RESERVATIONSTOPPINGTIME':
+                        reservation_stopping_time = float(value)
+            self.__set_reservation_id(reservation_id,reservation_stopping_time)
+        return toReturn
+    
+    def __set_ongoing(self):
+        with open(self.__file_ongoing,'w') as f:
+            f.write('#RESERVATIONID {}\n'.format(self.__reservation_id))
+            f.write('#RESERVATIONSTOPPINGTIME {}\n'.format(self.__reservation_stopping_time))
+    
+    def __clear_ongoing(self):
+        os.remove(self.__file_ongoing)
+    
+    def __is_running(self):
+        return os.path.isfile(self.__file_running)
+    
+    def __set_running(self):
+        with open(self.__file_running,'w') as f:
+            f.write('')
+    
+    def __clear_running(self):
+        os.remove(self.__file_running)
+    
+    def __is_terminating(self):
+        return os.path.isfile(self.__file_terminating)
+    
+    def __set_terminating(self):
+        with open(self.__file_terminating,'w') as f:
+            f.write('')
+    
+    def __clear_terminating(self):
+        os.remove(self.__file_terminating)
+    
+    def __is_updating(self):
+        return os.path.isfile(self.__file_updating)
+    
+    def __set_updating(self):
+        with open(self.__file_updating,'w') as f:
+            f.write('')
+    
+    def __clear_updating(self):
+        os.remove(self.__file_updating)
 
 class MoteListAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -40,6 +667,12 @@ def parse_options():
     parser.add_argument('-s','--site',
                         default     = 'rennes',
                         help        = 'select site',
+                        )
+    
+    parser.add_argument('-u','--update',
+                        action      = 'store_true',
+                        default     = False,
+                        help        = 'update to the latest version of OpenWSN',
                         )
     
     subparsers = parser.add_subparsers()
@@ -79,6 +712,12 @@ def parse_options():
                         help        = 'motes selection is performed again',
                         )
     
+    run_parser.add_argument('-r', '--dagrootCentered',
+                        action      = 'store_true',
+                        default     = False,
+                        help        = 'dagroot in the middle (default at the border)',
+                        )
+    
     group_run = run_parser.add_mutually_exclusive_group()
     
     group_run.add_argument('-f','--farMotes',
@@ -96,6 +735,11 @@ def parse_options():
                         )
     
     run_parser.set_defaults(closeFlag = False, numMotes = 30, command = 'run')
+    
+    # terminate parser
+    terminate_parser = subparsers.add_parser('terminate', help='terminate openVisualizer')
+    
+    terminate_parser.set_defaults(command = 'terminate')
     
     args = parser.parse_args()
     
@@ -128,385 +772,9 @@ def convert_set(motesSet):
         previous = current
     return stringToReturn
 
-# def prepare_openwsn():
-    # os.chdir(os.path.join('..','openwsn-fw'))
-    # subprocess.call(['git','pull'])
-    # subprocess.call(['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','oos_openwsn'])
-    # subprocess.call(['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','dagroot=1','oos_openwsn'])
-    # os.chdir(os.path.join('..','openwsn-sw'))
-    # subprocess.call(['git','pull'])
-    # subprocess.call(['git','clean','-fX'])
-    # os.chdir(os.path.join('..','scripts-iotlab'))
-
-class ReservationError(Exception):
-    def __init__(self,code,err=''):
-        self.code = code
-        self.err  = err
+def preexec_function():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     
-class Reservation(threading.Thread):
-    def __init__(self,args):
-        self.__args = args
-        dict_start_functions = {
-                        'start':    self.__start_reservation,
-                        'stop':     self.__stop_reservation,
-                        'run':      self.__start_openvisualizer,
-                        }
-        dict_stop_functions = {
-                        'start':    self.__stop_reservation,
-                        'stop':     self.__dummy,
-                        'run':      self.__stop_openvisualizer,
-                        }
-        self.run = dict_start_functions[self.__args.command]
-        self.stop = dict_stop_functions[self.__args.command]
-        self.__reset_variables()
-        threading.Thread.__init__(self)
-    
-    def __start_reservation(self):
-        # This method is called by a start process
-        if not (self.__get_running() or self.__is_starting() or self.__is_stopping()):
-            self.__set_starting()
-            condition = True 
-            while condition:
-                try:
-                    self.__start_reservation_internal()
-                except ReservationError as e:
-                    print '{}: {}'.format(e.code, e.err)
-                    if e.code not in ['STOPPING','TRY AGAIN']:
-                        self.__set_stopping()
-                    if e.code != 'TRY AGAIN':
-                        self.__clear_starting()
-                    self.__stop_reservation_internal()
-                    if e.code != 'TRY AGAIN':
-                        self.__clear_stopping()
-                        condition = False
-                except:
-                    self.__set_stopping()
-                    self.__clear_starting()
-                    self.__stop_reservation_internal()
-                    self.__clear_stopping()
-                    condition = False
-                else:
-                    self.__set_running()
-                    self.__clear_starting()
-                    condition = False
-    
-    def __stop_reservation(self):
-        # This method is called by a stop process
-        if not self.__is_stopping():
-            if self.__get_running():
-                self.__set_stopping()
-                self.__clear_running()
-                self.__stop_reservation_internal()
-                self.__clear_stopping()
-            elif self.__is_starting():
-                self.__set_stopping()
-    
-    def __dummy(self):
-        pass
-    
-    def __start_openvisualizer(self):
-        self.__prepare_openvisualizer()
-        try:
-            self.__start_openvisualizer_internal()
-        except ReservationError as e:
-            print '{}: {}'.format(e.code, e.err)
-        try:
-            self.__terminate_openvisualizer()
-        except ReservationError as e:
-            print '{}: {}'.format(e.code, e.err)
-            self.__terminate_openvisualizer()
-    
-    def __stop_openvisualizer(self):
-        pass
-    
-    def __start_reservation_internal(self):
-        # Check motes availability
-        command = ['experiment-cli','info','--site',self.__args.site,'-li']
-        stdout,stderr = self.__run_command(command,'Before checking motes availability',check_stderr=True)
-        motes_dict = json.loads(stdout)['items'][0][self.__args.site][MOTETYPE]
-        if motes_dict.has_key('Alive'):
-            self.__motes_alive = convert_string(motes_dict['Alive'])
-        for state_motes in motes_dict.itervalues():
-            self.__motes_all |= convert_string(state_motes)
-        if self.__args.moteList:
-            self.__motes_alive &= self.__args.moteList
-            self.__motes_all   &= self.__args.moteList
-        print '{} MOTES IN {}'.format(len(self.__motes_all),self.__args.site)
-        print
-        if self.__motes_alive < NUMBERMOTES:
-            raise ReservationError('DO NOT TRY AGAIN','NOT SUFFICIENT MOTES ALIVE: {}'.format(len(self.__motes_alive)))
-        print '{} MOTES ALIVE'.format(len(self.__motes_alive))
-        print convert_set(self.__motes_alive)
-        print
-        
-        # Submit reservation
-        command = ['experiment-cli','submit','-n',self.__args.name,'-d',self.__args.duration,
-                    '-l','{},{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(self.__motes_alive),FW)]
-        stdout,stderr = self.__run_command(command,'Before submitting reservation',check_stderr=True)
-        self.__reservation_id = json.loads(stdout)['id']
-        print 'RESERVATION ID {}'.format(self.__reservation_id)
-        print
-        
-        # Wait for reservation running
-        command = ['experiment-cli','wait','-i','{}'.format(self.__reservation_id)]
-        stdout,stderr = self.__run_command(command,'Before waiting Running state')
-        print stderr
-        print stdout
-        print
-        
-        # Log to file
-        if not os.path.exists(DUMPDIR):
-            os.makedirs(DUMPDIR)
-        with open(DUMPDIR+'/'+MOTESCHECKED+'_{}.txt'.format(self.__reservation_id),'a') as f:
-            f.write('#ALL {}\n'.format(convert_set(self.__motes_all)))
-            f.write('#ALIVE {}\n'.format(convert_set(self.__motes_alive)))
-        
-        # Check reservation
-        command = ['experiment-cli','get','-p','-i','{}'.format(self.__reservation_id)]
-        stdout,stderr = self.__run_command(command,'Before checking reservation',check_stderr=True)
-        motes_dict = json.loads(stdout)['deploymentresults']
-        if motes_dict.has_key('0'):
-            self.__motes_available = set([int(mote.split('.')[0][len(MOTENAMEPREAMBLE):]) for mote in motes_dict['0']])
-        if self.__motes_available < NUMBERMOTES:
-            raise ReservationError('TRY AGAIN','NOT SUFFICIENT MOTES AVAILABLE: {}'.format(self.__motes_available))
-        print '{} MOTES AVAILABLE'.format(len(self.__motes_available))
-        print convert_set(self.__motes_available)
-        print
-        
-        # Log to file
-        if not os.path.exists(DUMPDIR):
-            os.makedirs(DUMPDIR)
-        with open(DUMPDIR+'/'+MOTESCHECKED+'_{}.txt'.format(self.__reservation_id),'a') as f:
-            f.write('#AVAILABLE {}\n'.format(convert_set(self.__motes_available)))
-        
-        # # Reset motes and keep track of successful motes
-        # self.__motes_working = self.__get_motes_reachable(self.__motes_available)
-        # motes_to_check = self.__motes_available - self.__motes_working
-        # while motes_to_check:
-            # motes_to_check = self.__send_node_cli_command_to_motes(motes_to_check,'stop')
-            # motes_to_check = self.__send_node_cli_command_to_motes(motes_to_check,'start')
-            # motes_to_check = self.__send_node_cli_command_to_motes(motes_to_check,'reset')
-            # motes_reachable = self.__get_motes_reachable(motes_to_check)
-            # if motes_reachable:
-                # self.__motes_working |= motes_reachable
-                # motes_to_check -= motes_reachable
-            # else:
-                # motes_to_check = set([])
-        
-        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_available,'stop')
-        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'start')
-        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'update',FW)
-        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'reset')
-        self.__motes_working = self.__get_motes_reachable(self.__motes_working)
-        self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
-        
-        if self.__motes_working < NUMBERMOTES:
-            raise ReservationError('TRY AGAIN','NOT SUFFICIENT MOTES WORKING: {}'.format(self.__motes_working))
-        print '{} MOTES WORKING'.format(len(self.__motes_working))
-        print convert_set(self.__motes_working)
-        print
-        
-        # Log to file
-        with open(DUMPDIR+'/'+MOTESCHECKED+'_{}.txt'.format(self.__reservation_id),'a') as f:
-            f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
-    
-    def __stop_reservation_internal(self):
-        if self.__reservation_id:
-            command = ['experiment-cli','stop','-i','{}'.format(self.__reservation_id)]
-            self.__run_command(command)
-            command = ['experiment-cli','wait','-i','{}'.format(self.__reservation_id),'--state','Error,Terminated']
-            self.__run_command(command)
-            self.__reset_variables()
-    
-    def __prepare_openvisualizer(self):
-        if not self.__get_running():
-            print 'START RESERVATION BEFORE RUNNING OPENVISUALIZER'
-            print
-            return
-        
-        with open(DUMPDIR+'/'+MOTESCHECKED+'_{}.txt'.format(self.__reservation_id)) as f:
-            lines = f.readlines()
-        for line in lines:
-            tag, motes = line.strip().split()
-            motes_set = convert_string(motes)
-            if tag == '#ALL':
-                self.__motes_all = motes_set
-            elif tag == '#ALIVE':
-                self.__motes_alive = motes_set
-            elif tag == '#AVAILABLE':
-                self.__motes_available = motes_set
-            elif tag == '#WORKING':
-                self.__motes_working = motes_set
-        
-        if len(self.__motes_working)<self.__args.numMotes:
-            print 'NOT SUFFICIENT WORKING MOTES'
-            print 'WORKING MOTES: {}'.format(len(self.__motes_working))
-            print 'MOTES REQUIRED: {}'.format(self.__args.numMotes)
-            print
-            return
-        
-        density_name = 'far'
-        if self.__args.closeFlag:
-            density_name = 'close'
-        newMotesSelectedList = self.__args.anotherMoteList
-        newMotesSelectedList |= (not os.path.isfile(DUMPDIR+'/'+MOTESKNOWN+'_{}_{}_{}.txt'.format(self.__reservation_id,self.__args.numMotes,density_name)))
-        if not newMotesSelectedList:
-            with open(DUMPDIR+'/'+MOTESKNOWN+'_{}_{}_{}.txt'.format(self.__reservation_id,self.__args.numMotes,density_name)) as f:
-                lines = f.readlines()
-            for line in lines:
-                tag, motes = line.strip().split()
-                motes_set = convert_string(motes)
-                if tag == '#SELECTED':
-                    self.__motes_selected = motes_set
-                elif tag == '#DAGROOT':
-                    self.__dagroot = motes_set
-        else:
-            self.__select_new_list_of_motes()
-            with open(DUMPDIR+'/'+MOTESKNOWN+'_{}_{}_{}.txt'.format(self.__reservation_id,self.__args.numMotes,density_name),'w') as f:
-                f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
-                f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))
-    
-    def __start_openvisualizer_internal(self):
-        self.__loop_send_node_cli_command_to_motes(self.__dagroot,'start')
-        self.__loop_send_node_cli_command_to_motes(self.__dagroot,'update',FW_DAGROOT)
-        self.__loop_send_node_cli_command_to_motes(self.__dagroot,'stop')
-        
-        self.__loop_send_node_cli_command_to_motes(self.__motes_selected,'start')
-        self.__loop_send_node_cli_command_to_motes(self.__motes_selected,'reset')
-        motes_not_working = self.__motes_selected - self.__get_motes_reachable(self.__motes_selected)
-        while motes_not_working:
-            self.__loop_send_node_cli_command_to_motes(motes_not_working,'start')
-            self.__loop_send_node_cli_command_to_motes(motes_not_working,'reset')
-            motes_not_working -= self.__get_motes_reachable(motes_not_working)
-
-        os.chdir(os.path.join('..','openwsn-sw','software','openvisualizer','bin','openVisualizerApp'))
-        subprocess.call(['python','openVisualizerWeb.py','--port','1234','--iotlabmotes',','.join([MOTENAMEPREAMBLE+str(mote) for mote in self.__motes_selected])])
-        
-    def __terminate_openvisualizer(self):
-        motes_not_working = self.__motes_selected - self.__get_motes_reachable(self.__motes_selected)
-        print 'MOTES UNREACHABLE AFTER CLOSING OPENVISUALIZER:'
-        print convert_set(motes_not_working)
-        self.__loop_send_node_cli_command_to_motes(self.__dagroot,'start')
-        self.__loop_send_node_cli_command_to_motes(self.__dagroot,'update',FW)
-        self.__loop_send_node_cli_command_to_motes(self.__motes_selected,'stop')
-    
-    def __send_node_cli_command_to_motes(self,motes,op,op_arg=None):
-        motes_successful = set([])
-        if motes:
-            command = ['node-cli','-i','{}'.format(self.__reservation_id),
-                        '-l','{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(motes)),'--{}'.format(op)]
-            if op_arg:
-                command += [op_arg]
-            stdout,stderr = self.__run_command(command,'Before node-cli command',check_stderr=True)
-            motes_dict = json.loads(stdout)
-            if motes_dict.has_key('0'):
-                motes_successful = set([int(mote.split('.')[0][len(MOTENAMEPREAMBLE):]) for mote in motes_dict['0']])
-                print 'NOT WORKING ({}):'.format(op)
-                print convert_set(motes-motes_successful)
-                print
-        return motes_successful
-    
-    def __loop_send_node_cli_command_to_motes(self,motes,op,op_arg=None):
-        motes_failure = motes - self.__send_node_cli_command_to_motes(motes,op,op_arg)
-        while motes_failure:
-            motes_failure -= self.__send_node_cli_command_to_motes(motes_failure,op,op_arg)
-    
-    def __get_motes_reachable(self,motes_to_test):
-        print 'CHECKING REACHABILITY FOR THE FOLLOWING MOTES'
-        print convert_set(motes_to_test)
-        print
-        print 'NOT WORKING (TCP):'
-        motes_responding = set([])
-        for mote_n in motes_to_test:
-            if self.__is_stopping():
-                raise ReservationError('STOPPING','While checking reachability')
-            mote = MOTENAMEPREAMBLE+str(mote_n)
-            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            sock.connect((mote,20000))
-            sock.settimeout(10)
-            try:
-                data = sock.recv(1024)
-            except socket.timeout:
-                print '{}'.format(mote),
-                
-            else:
-                motes_responding.add(mote_n)
-            sock.close()
-        print
-        print
-        return motes_responding
-    
-    def __select_new_list_of_motes(self):
-        motes_working = sorted(self.__motes_working)
-        if self.__args.closeFlag:
-            self.__motes_selected = set(motes_working[:self.__args.numMotes])
-        else:
-            factor=float(len(motes_working)-1)/float(self.__args.numMotes-1)
-            factor_diff=0
-            while motes_working:
-                self.__motes_selected.add(motes_working.pop(0))
-                factor_int = int(factor + factor_diff)
-                factor_diff = factor + factor_diff - factor_int
-                motes_working = motes_working[factor_int-1:]
-        self.__dagroot = set([sorted(self.__motes_selected)[0]])
-    
-    def __reset_variables(self):
-        self.__motes_all = set([])
-        self.__motes_alive = set([])
-        self.__motes_available = set([])
-        self.__motes_working = set([])
-        self.__motes_selected = set([])
-        self.__dagroot = None
-        self.__reservation_id = None
-    
-    def __is_starting(self):
-        return os.path.isfile(STARTINGRESERVATION+self.__args.site)
-    
-    def __set_starting(self):
-        with open(STARTINGRESERVATION+self.__args.site,'w') as f:
-            f.write('')
-    
-    def __clear_starting(self):
-        os.remove(STARTINGRESERVATION+self.__args.site)
-    
-    def __get_running(self):
-        toReturn = os.path.isfile(RUNNINGRESERVATION+self.__args.site)
-        if toReturn:
-            with open(RUNNINGRESERVATION+self.__args.site) as f:
-                self.__reservation_id = int(f.readline())
-        return toReturn
-    
-    def __set_running(self):
-        with open(RUNNINGRESERVATION+self.__args.site,'w') as f:
-            f.write('{}'.format(self.__reservation_id))
-    
-    def __clear_running(self):
-        os.remove(RUNNINGRESERVATION+self.__args.site)
-    
-    def __is_stopping(self):
-        return os.path.isfile(STOPPINGRESERVATION+self.__args.site)
-    
-    def __set_stopping(self):
-        with open(STOPPINGRESERVATION+self.__args.site,'w') as f:
-            f.write('')
-    
-    def __clear_stopping(self):
-        os.remove(STOPPINGRESERVATION+self.__args.site)
-    
-    def __run_command(self,input,stopping_check_message='',check_stderr=False):
-        if stopping_check_message:
-            if self.__is_stopping():
-                raise ReservationError('STOPPING',stopping_check_message)
-        print 'RUNNING THE FOLLOWING:'
-        print ' '.join(input)
-        print
-        s = subprocess.Popen(input,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        stdout,stderr = s.communicate()
-        if check_stderr:
-            if stderr:
-                raise ReservationError('STDERR',stderr)
-        return stdout,stderr
-
 def main():
     args = parse_options()
     r = Reservation(args)
