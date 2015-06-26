@@ -85,8 +85,7 @@ class Reservation(threading.Thread):
         self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING_PREAMBLE + self.__args.site)
         self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING_PREAMBLE + self.__args.site)
         self.__reset_variables()
-        self.__goOn = False
-        self.__prepare()
+        self.__decide_ownership()
         threading.Thread.__init__(self)
     
     #-------------------self.run AND self.stop METHODS-------------------#
@@ -95,7 +94,7 @@ class Reservation(threading.Thread):
         
         # This method is called by a start command
         
-        if not self.__goOn:
+        if not self.__ownership.is_set():
             return
 
         self.__set_starting()
@@ -157,7 +156,7 @@ class Reservation(threading.Thread):
         
         # This method is called by a run command
         
-        if not self.__goOn:
+        if not self.__ownership.is_set():
             return
         
         self.__set_running()
@@ -170,7 +169,7 @@ class Reservation(threading.Thread):
                 raise ReservationSelfStopping('No reservation running')
             else:
                 time_remaining = self.__reservation_stopping_time - time.time()
-                if (time_remaining) <= self.GUARDTIME:
+                if (time_remaining) <= self.RESERVATION_GUARDTIME:
                     raise ReservationSelfStopping('Only {} minutes remaining within this reservation: not sufficient time'.format(time_remaining/60))
                 print '{} minutes remaining within this reservation'.format(time_remaining/60)
             if update:
@@ -181,29 +180,30 @@ class Reservation(threading.Thread):
             os.chdir(os.path.join(self.__working_directory,'..','openwsn-sw','software','openvisualizer','bin','openVisualizerApp'))
             command = ['python','openVisualizerWeb.py','--port',
                         '1234','--iotlabmotes',','.join(['{}-{}'.format(MOTETYPE,str(mote)) for mote in self.__motes_selected])]
+            self.__ownership.clear()
             s = subprocess.Popen(command, stdin = subprocess.PIPE, preexec_fn = preexec_function)
-            keyboardinterrupt_flag = False
             while all([ s.poll()==None, 
                         not self.__is_terminating(),
                         not self.__is_stopping(),
-                        (self.__reservation_stopping_time - time.time()) > self.GUARDTIME,
+                        (self.__reservation_stopping_time - time.time()) > self.RESERVATION_GUARDTIME,
                         ]):
-                try:
-                    time.sleep(60)
-                except KeyboardInterrupt:
-                    keyboardinterrupt_flag = True
+                self.__ownership.wait(30)
+                if self.__ownership.is_set():
+                    break
+                
             s.stdin.write('q\n')
             s.wait()
             time_remaining = self.__reservation_stopping_time - time.time()
             if self.__is_stopping():
                 raise ReservationStopping('Reservation stopped while openVisualizer was running')
-            elif time_remaining <= self.GUARDTIME:
+            elif time_remaining <= self.RESERVATION_GUARDTIME:
                 raise ReservationSelfStopping('Only {} minutes remaining within this reservation: forced closing of openVisualizer'.format(time_remaining/60))
             elif self.__is_terminating():
                 self.__clear_terminating()
-                if keyboardinterrupt_flag:
+                if self.__ownership.is_set():
                     print '\nCtrl-C forced closing openVisualizer'
                 else:
+                    self.__ownership.set()
                     print '\nAnother external process terminated the experiment: openVisualizer closed'
             else:
                 print '\nOpenVisualizer gracefully stopped itself!'
@@ -238,6 +238,7 @@ class Reservation(threading.Thread):
         
         if all([not self.__is_stopping(),self.__is_running()]):
             self.__set_terminating()
+            self.__ownership.set()
             print 'TERMINATE SIGNAL SENT TO THE RUNNING EXPERIMENT'
         else:
             print 'NO EXPERIMENT TO TERMINATE OR THE RESERVATION IS STOPPING'
@@ -489,7 +490,8 @@ class Reservation(threading.Thread):
     
     #-------------------STATE METHODS-------------------#
     
-    def __prepare(self):
+    def __decide_ownership(self):
+        self.__ownership = threading.Event()
         if self.__args.command == 'start':
             if self.__get_ongoing():
                 print 'RESERVATION RUNNING: YOU CANNOT START ANOTHER ONE!'
@@ -500,7 +502,7 @@ class Reservation(threading.Thread):
             if self.__is_stopping():
                 print 'RESERVATION STOPPING: WAIT!'
                 return
-            self.__goOn = True
+            self.__ownership.set()
         elif self.__args.command == 'run':
             if self.__is_stopping():
                 print 'RESERVATION STOPPING: TRY RESTARTING FIRST A RESERVATION!'
@@ -546,7 +548,7 @@ class Reservation(threading.Thread):
                     newMotesSelectedList = True
             if newMotesSelectedList:
                 self.__select_motes_to_run()
-            self.__goOn = True
+            self.__ownership.set()
     
     def __reset_variables(self):
         self.__motes_all = set([])
