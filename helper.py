@@ -179,7 +179,7 @@ class Reservation(threading.Thread):
             print '\nRunning openVisualizer'
             os.chdir(os.path.join(self.__working_directory,'..','openwsn-sw','software','openvisualizer','bin','openVisualizerApp'))
             command = ['python','openVisualizerWeb.py','--port',
-                        '1234','--iotlabmotes',','.join(['{}-{}'.format(MOTETYPE,str(mote)) for mote in self.__motes_selected])]
+                        '1234','--iotlabmotes',','.join([self.__convert_to_url(mote) for mote in self.__motes_selected])]
             self.__ownership.clear()
             s = subprocess.Popen(command, stdin = subprocess.PIPE, preexec_fn = preexec_function)
             while all([ s.poll()==None, 
@@ -303,7 +303,7 @@ class Reservation(threading.Thread):
         stdout = self.__run_command(command,'Before checking reservation')
         motes_dict = json.loads(stdout)['deploymentresults']
         if motes_dict.has_key('0'):
-            self.__motes_available = set([int(mote.split('.')[0][len(MOTETYPE)+1:]) for mote in motes_dict['0']])
+            self.__motes_available = set([self.__convert_to_id(mote) for mote in motes_dict['0']])
         if self.__motes_available < NUMBERMOTES:
             raise ReservationContinuing('Only {} motes available'.format(self.__motes_available))
         print '\n{} motes available:\n{}'.format(len(self.__motes_available),convert_set(self.__motes_available))
@@ -420,7 +420,7 @@ class Reservation(threading.Thread):
             stdout = self.__run_command(command,'Before node-cli command')
             motes_dict = json.loads(stdout)
             if motes_dict.has_key('0'):
-                motes_successful = set([int(mote.split('.')[0][len(MOTETYPE)+1:]) for mote in motes_dict['0']])
+                motes_successful = set([self.__convert_to_id(mote) for mote in motes_dict['0']])
                 if motes-motes_successful:
                     print '{} motes not working ({}):\n{}'.format(len(motes-motes_successful),op,convert_set(motes-motes_successful))
         return motes_successful
@@ -434,23 +434,23 @@ class Reservation(threading.Thread):
         if motes_to_test:
             print '\nChecking TCP reachability for:\n{}'.format(convert_set(motes_to_test))
         motes_responding = set([])
-        for mote_n in motes_to_test:
+        for mote in motes_to_test:
             error_message = 'While checking reachability'
             if self.__is_stopping():
                 raise ReservationStopping(error_message)
             if self.__is_terminating():
                 raise ExperimentTerminating(error_message)
-            mote = '{}-{}'.format(MOTETYPE,str(mote_n))
             sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            sock.connect((mote,20000))
+            sock.connect((self.__convert_to_url(mote),20000))
             sock.settimeout(10)
             try:
                 data = sock.recv(1024)
             except socket.timeout:
                 pass
             else:
-                motes_responding.add(mote_n)
+                motes_responding.add(mote)
             sock.close()
+        print
         if motes_to_test-motes_responding:
             print '{} motes not working (tcp):\n{}'.format(len(motes_to_test-motes_responding),convert_set(motes_to_test-motes_responding))
         return motes_responding
@@ -487,6 +487,12 @@ class Reservation(threading.Thread):
             self.__dagroot = set([motes_selected_sorted[len(motes_selected_sorted)/2]])
         else:
             self.__dagroot = set([motes_selected_sorted[0]])
+    
+    def __convert_to_id(self,mote_url):
+        return int(mote_url.split('.')[0].split('-')[1])
+    
+    def __convert_to_url(self,mote_id):
+        return '{}-{}.{}.iot-lab.info'.format(MOTETYPE,mote_id,self.__args.site)
     
     #-------------------STATE METHODS-------------------#
     
@@ -532,8 +538,7 @@ class Reservation(threading.Thread):
             if len(self.__motes_working)<self.__args.numMotes:
                 print 'NO SUFFICIENT MOTES: YOU CANNOT RUN SO MANY MOTES IN THIS RESERVATION!'
                 return
-            newMotesSelectedList = self.__args.anotherMoteList
-            newMotesSelectedList |= (not os.path.isfile(self.__file_motes_known))
+            newMotesSelectedList = not os.path.isfile(self.__file_motes_known)
             if not newMotesSelectedList:
                 with open(self.__file_motes_known) as f:
                     lines = f.readlines()
@@ -566,12 +571,15 @@ class Reservation(threading.Thread):
         self.__file_motes_known = None
         if reservation_id:
             self.__file_motes_checked = os.path.join(self.__dump_directory,self.MOTESCHECKED_PREAMBLE+'_{}.txt'.format(reservation_id))
-            if all(k in self.__args.__dict__ for k in ('numMotes','closeFlag')):
+            if all(k in self.__args.__dict__ for k in ('numMotes','closeFlag','dagrootCentered')):
                 density = 'far'
                 if self.__args.closeFlag:
                     density = 'close'
+                dagroot_position = 'side'
+                if self.__args.dagrootCentered:
+                    dagroot_position = 'center'
                 self.__file_motes_known = os.path.join(self.__dump_directory,
-                                        self.MOTESKNOWN_PREAMBLE+'_{}_{}_{}.txt'.format(reservation_id,self.__args.numMotes,density))
+                            self.MOTESKNOWN_PREAMBLE+'_{}_{}_{}_{}_dagroot.txt'.format(reservation_id,self.__args.numMotes,density,dagroot_position))
     
     def __is_starting(self):
         return os.path.isfile(self.__file_starting)
@@ -707,12 +715,6 @@ def parse_options():
     
     # run parser
     run_parser = subparsers.add_parser('run', help='run openVisualizer')
-    
-    run_parser.add_argument('-a', '--anotherMoteList',
-                        action      = 'store_true',
-                        default     = False,
-                        help        = 'motes selection is performed again',
-                        )
     
     run_parser.add_argument('-r', '--dagrootCentered',
                         action      = 'store_true',
