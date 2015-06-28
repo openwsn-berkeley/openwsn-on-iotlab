@@ -7,11 +7,6 @@ import json
 import signal
 import time
 
-MOTETYPE            = 'wsn430'
-FW                  = 'openwsn-fw/build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex'
-FW_DAGROOT          = 'openwsn-fw/build/wsn430v14_mspgcc_dagroot/projects/common/03oos_openwsn_prog.ihex'
-NUMBERMOTES         = 100
-
 class ReservationManagerException(Exception):
     def __init__(self,err=''):
         self.err  = err
@@ -45,18 +40,19 @@ class CommandError(ReservationManagerException):
 
 class Reservation(threading.Thread):
     DUMPDIR                 = 'RESERVATIONS'
-    STARTING_PREAMBLE       = '.STARTING'
-    STOPPING_PREAMBLE       = '.STOPPING'
-    ONGOING_PREAMBLE        = '.ONGOING'
-    RUNNING_PREAMBLE        = '.RUNNING'
-    TERMINATING_PREAMBLE    = '.TERMINATING'
-    UPDATING_PREAMBLE       = '.UPDATING'
-    MOTESCHECKED_PREAMBLE   = 'motes_checked'
-    MOTESKNOWN_PREAMBLE     = 'mote_known'
+    STARTING                = '.STARTING'
+    STOPPING                = '.STOPPING'
+    ONGOING                 = '.ONGOING'
+    RUNNING                 = '.RUNNING'
+    TERMINATING             = '.TERMINATING'
+    UPDATING                = '.UPDATING'
+    MOTESCHECKED            = 'motes_checked'
+    MOTESKNOWN              = 'mote_known'
     RESERVATION_GUARDTIME   = 600 # 10 minutes of guard time from the estimated end of the reservation
     
-    def __init__(self,args):
+    def __init__(self,args,site):
         self.__args = args
+        self.__site = site
         dict_start_functions = {
                         'start':        self.__reservation_start,
                         'stop':         self.__reservation_stop,
@@ -72,18 +68,18 @@ class Reservation(threading.Thread):
         self.run = dict_start_functions[self.__args.command]
         self.stop = dict_stop_functions[self.__args.command]
         
-        self.__working_directory    = os.getcwd()
+        self.__working_directory    = os.path.join(os.getcwd(),'..')
         self.__dump_directory       = os.path.join(self.__working_directory,self.DUMPDIR)
         if not os.path.exists(self.__dump_directory):
             os.makedirs(self.__dump_directory)
-        self.__file_firmware_regular    = os.path.join(self.__working_directory,'..',FW)
-        self.__file_firmware_dagroot    = os.path.join(self.__working_directory,'..',FW_DAGROOT)
-        self.__file_starting            = os.path.join(self.__working_directory,self.STARTING_PREAMBLE + self.__args.site)
-        self.__file_stopping            = os.path.join(self.__working_directory,self.STOPPING_PREAMBLE + self.__args.site)
-        self.__file_ongoing             = os.path.join(self.__working_directory,self.ONGOING_PREAMBLE + self.__args.site)
-        self.__file_running             = os.path.join(self.__working_directory,self.RUNNING_PREAMBLE + self.__args.site)
-        self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING_PREAMBLE + self.__args.site)
-        self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING_PREAMBLE + self.__args.site)
+        self.__file_firmware_regular    = os.path.join(self.__working_directory,'..','openwsn-fw',FW_REGULAR_PATH)
+        self.__file_firmware_dagroot    = os.path.join(self.__working_directory,'..','openwsn-fw',FW_DAGROOT_PATH)
+        self.__file_starting            = os.path.join(self.__working_directory,self.STARTING)
+        self.__file_stopping            = os.path.join(self.__working_directory,self.STOPPING)
+        self.__file_ongoing             = os.path.join(self.__working_directory,self.ONGOING)
+        self.__file_running             = os.path.join(self.__working_directory,self.RUNNING)
+        self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING)
+        self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING)
         self.__reset_variables()
         self.__decide_ownership()
         threading.Thread.__init__(self)
@@ -100,8 +96,7 @@ class Reservation(threading.Thread):
         self.__set_starting()
         
         try:
-            if self.__args.update:
-                self.__update_openwsn()
+            self.__update_openwsn()
             while True:
                 self.__reservation_start_header()
                 try:
@@ -251,9 +246,9 @@ class Reservation(threading.Thread):
     def __reservation_start_header(self):
         
         # Check motes availability
-        command = ['experiment-cli','info','--site',self.__args.site,'-li']
+        command = ['experiment-cli','info','--site',self.__site,'-li']
         stdout = self.__run_command(command,'Before checking motes availability')
-        motes_dict = json.loads(stdout)['items'][0][self.__args.site][MOTETYPE]
+        motes_dict = json.loads(stdout)['items'][0][self.__site][MOTETYPE]
         if motes_dict.has_key('Alive'):
             self.__motes_alive = convert_string(motes_dict['Alive'])
         for state_motes in motes_dict.itervalues():
@@ -261,8 +256,8 @@ class Reservation(threading.Thread):
         if self.__args.moteList:
             self.__motes_alive &= self.__args.moteList
             self.__motes_all   &= self.__args.moteList
-        print '\n{} motes in total in {}:\n{}'.format(len(self.__motes_all),self.__args.site,convert_set(self.__motes_all))
-        if self.__motes_alive < NUMBERMOTES:
+        print '\n{} motes in total in {}:\n{}'.format(len(self.__motes_all),self.__site,convert_set(self.__motes_all))
+        if self.__motes_alive < self.__args.workingMotes:
             raise ReservationSelfStopping('Only {} motes alive'.format(len(self.__motes_alive)))
         print '\n{} motes alive:\n{}'.format(len(self.__motes_alive),convert_set(self.__motes_alive))
     
@@ -270,7 +265,7 @@ class Reservation(threading.Thread):
         
         # Submit reservation
         command = ['experiment-cli','submit','-n',self.__args.name,'-d',self.__args.duration,
-                    '-l','{},{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(self.__motes_alive),self.__file_firmware_regular)]
+                    '-l','{},{},{},{}'.format(self.__site,MOTETYPE,convert_set(self.__motes_alive),self.__file_firmware_regular)]
         stdout = self.__run_command(command,'Before submitting reservation')
         reservation_id = json.loads(stdout)['id']
         
@@ -304,7 +299,7 @@ class Reservation(threading.Thread):
         motes_dict = json.loads(stdout)['deploymentresults']
         if motes_dict.has_key('0'):
             self.__motes_available = set([self.__convert_to_id(mote) for mote in motes_dict['0']])
-        if self.__motes_available < NUMBERMOTES:
+        if self.__motes_available < self.__args.workingMotes:
             raise ReservationContinuing('Only {} motes available'.format(self.__motes_available))
         print '\n{} motes available:\n{}'.format(len(self.__motes_available),convert_set(self.__motes_available))
         
@@ -319,7 +314,7 @@ class Reservation(threading.Thread):
         self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'reset')
         self.__motes_working = self.__get_motes_reachable(self.__motes_working)
         self.__motes_working = self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
-        if self.__motes_working < NUMBERMOTES:
+        if self.__motes_working < self.__args.workingMotes:
             raise ReservationContinuing('Only {} motes working'.format(self.__motes_working))
         print '\n{} motes working:\n{}'.format(len(self.__motes_working),convert_set(self.__motes_working))
         
@@ -390,12 +385,23 @@ class Reservation(threading.Thread):
     def __update_openwsn(self):
         
         os.chdir(os.path.join(self.__working_directory,'..','openwsn-fw'))
+        
+        # pull openwsn-fw
         command = ['git','pull']
         self.__run_command(command,'Before pulling openwsn-fw')
-        command = ['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','oos_openwsn']
-        self.__run_command(command,'Before compiling regular firmware')
+        
+        # compile dagroot
         command = ['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','dagroot=1','oos_openwsn']
         self.__run_command(command,'Before compiling dagroot firmware')
+        
+        # create filenames for dagroot and regular: if the path is the same, change the dagroot firmware file name
+        if self.__file_firmware_dagroot == self.__file_firmware_regular:
+            self.__file_firmware_dagroot = os.path.join(os.path.split(self.__file_firmware_dagroot)[0],'03oos_openwsn_dagroot_prog.ihex')
+            os.rename(self.__file_firmware_regular,self.__file_firmware_dagroot)
+        
+        command = ['scons','board=wsn430v14','toolchain=mspgcc','noadaptivesync=1','oos_openwsn']
+        self.__run_command(command,'Before compiling regular firmware')
+        
         os.chdir(os.path.join(self.__working_directory,'..','openwsn-sw'))
         command = ['git','pull']
         self.__run_command(command,'Before pulling openwsn-sw')
@@ -414,7 +420,7 @@ class Reservation(threading.Thread):
         motes_successful = set([])
         if motes:
             command = ['node-cli','-i','{}'.format(self.__reservation_id),
-                        '-l','{},{},{}'.format(self.__args.site,MOTETYPE,convert_set(motes)),'--{}'.format(op)]
+                        '-l','{},{},{}'.format(self.__site,MOTETYPE,convert_set(motes)),'--{}'.format(op)]
             if op_arg:
                 command += [op_arg]
             stdout = self.__run_command(command,'Before node-cli command')
@@ -492,7 +498,7 @@ class Reservation(threading.Thread):
         return int(mote_url.split('.')[0].split('-')[1])
     
     def __convert_to_url(self,mote_id):
-        return '{}-{}.{}.iot-lab.info'.format(MOTETYPE,mote_id,self.__args.site)
+        return '{}-{}.{}.iot-lab.info'.format(MOTETYPE,mote_id,self.__site)
     
     #-------------------STATE METHODS-------------------#
     
@@ -674,27 +680,10 @@ def parse_options():
     # main parser
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('-s','--site',
-                        default     = 'rennes',
-                        help        = 'select site',
-                        )
-    
-    parser.add_argument('-u','--update',
-                        action      = 'store_true',
-                        default     = False,
-                        help        = 'update to the latest version of OpenWSN',
-                        )
-    
     subparsers = parser.add_subparsers()
     
     # start parser
     start_parser = subparsers.add_parser('start', help='start reservation')
-    
-    start_parser.add_argument('-l','--moteList',
-                        action      = MoteListAction,
-                        default     = set([]),
-                        help        = 'select specific motes'
-                        )
     
     start_parser.add_argument('-n', '--name',
                         default     = 'minimaltest',
@@ -706,6 +695,32 @@ def parse_options():
                         help        = 'experiment duration in minutes',
                         )
     
+    start_parser.add_argument('-w', '--workingMotes',
+                        type        = int
+                        default     = 2,
+                        help        = 'minimum number of working motes',
+                        )
+    
+    group_start = start_parser.add_mutually_exclusive_group()
+    
+    group_start.add_argument('-ml','--moteList',
+                        action      = MoteListAction,
+                        default     = set([]),
+                        help        = 'select specific motes'
+                        )
+    
+    group_start.add_argument('-mn','--moteNumber',
+                        type        = int
+                        default     = 20,
+                        help        = 'select a number of motes'
+                        )
+    
+    group_start.add_argument('-ma','--moteAll',
+                        action      = 'store_true'
+                        default     = False,
+                        help        = 'select all motes'
+                        )
+    
     start_parser.set_defaults(command = 'start')
     
     # stop parser
@@ -715,6 +730,12 @@ def parse_options():
     
     # run parser
     run_parser = subparsers.add_parser('run', help='run openVisualizer')
+    
+    run_parser.add_argument('-u','--update',
+                        action      = 'store_true',
+                        default     = False,
+                        help        = 'update to the latest version of OpenWSN',
+                        )
     
     run_parser.add_argument('-r', '--dagrootCentered',
                         action      = 'store_true',
@@ -738,7 +759,7 @@ def parse_options():
                         help        = 'motes are selected as close as possible',
                         )
     
-    run_parser.set_defaults(closeFlag = False, numMotes = 30, command = 'run')
+    run_parser.set_defaults(closeFlag = False, numMotes = 10, command = 'run')
     
     # terminate parser
     terminate_parser = subparsers.add_parser('terminate', help='terminate openVisualizer')
@@ -781,7 +802,10 @@ def preexec_function():
     
 def main():
     args = parse_options()
-    r = Reservation(args)
+    s = subprocess.Popen('hostname',stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    stdout,_ = s.communicate()
+    site = stdout.strip()
+    r = Reservation(args,site)
     r.start()
     try:
         while r.isAlive():
