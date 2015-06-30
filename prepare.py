@@ -13,7 +13,7 @@ FIRMWARE_BRANCH         = 'develop'
 SOFTWARE_REPOSITORY     = 'https://github.com/openwsn-berkeley/openwsn-sw.git'
 SOFTWARE_BRANCH         = 'develop'
 
-FIRMWARE_PATH           = "openwsn-fw/build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex"
+FIRMWARE_PATH           = '"build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex"'
 
 openwsn_on_iotlab_dir = os.getcwd()
 openwsn_on_iotlab_parentdir = os.path.join(openwsn_on_iotlab_dir,'..')
@@ -58,17 +58,12 @@ def parse_options():
                         default     = False,
                         help        = 'uninstall openwsn-on-iotlab environment',
                         )
-    
-    parser.add_argument('-r','--resetSettings',
-                        action      = 'store_true',
-                        default     = False,
-                        help        = 'reset default settings',
-                        )
                         
     parser.add_argument('-d','--dagrootFirmwarePath',
                         default     = FIRMWARE_PATH,
                         help        = 'specify the dagroot firmware location',
                         )
+    
     args = parser.parse_args()
     
     return args
@@ -162,7 +157,7 @@ def install(args):
     
     # create settings file for reservation (it can be modified by any user, without being tracked by git)
     
-    if not os.path.isfile(os.path.join(openwsn_on_iotlab_dir,'helper-tool','settings.py')) or args.resetSettings:
+    if not os.path.isfile(os.path.join(openwsn_on_iotlab_dir,'helper-tool','settings.py')) or (args.dagrootFirmwarePath != FIRMWARE_PATH):
         with open(os.path.join(openwsn_on_iotlab_dir,'helper-tool','settings.py'),'w') as f:
             f.write('MOTETYPE        = "wsn430"\n')
             f.write('FW_REGULAR_PATH = {0}\n'.format(FIRMWARE_PATH))

@@ -5,6 +5,7 @@ import sys
 import subprocess
 from prepare import *
 
+os.environ['PATH'] = '/usr/bin:' + os.environ['PATH']
 activate_this_file = os.path.join(home,'venv','bin','activate_this.py')
 print_prepare = True
 if os.path.isfile(activate_this_file):
