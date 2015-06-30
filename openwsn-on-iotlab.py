@@ -23,4 +23,4 @@ if os.path.isfile(activate_this_file):
                 pass
         
 if print_prepare:
-    print 'PLEASE, RUN ./prepare.py'
+    print 'PLEASE RUN ./prepare.py'
