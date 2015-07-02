@@ -418,7 +418,7 @@ class Reservation(threading.Thread):
         
         with open(self.__file_motes_known,'a') as f:
             f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
-            f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))1
+            f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))
         if update:
             motes_not_started = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_working,'start')
             dagroot_not_started = set([])
