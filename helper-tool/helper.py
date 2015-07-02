@@ -48,9 +48,9 @@ class Reservation(threading.Thread):
     RUNNING                 = '.RUNNING'
     TERMINATING             = '.TERMINATING'
     UPDATING                = '.UPDATING'
-    MOTESCHECKED_PREAMBLE   = 'motes_checked'
+    MOTESAVAILABLE_PREAMBLE = 'motes_available'
     MOTESWORKING_PREAMBLE   = 'motes_working'
-    MOTESKNOWN_PREAMBLE     = 'mote_known'
+    MOTESSELECTED_PREAMBLE  = 'motes_selected'
     RESERVATION_GUARDTIME   = 600 # 10 minutes of guard time from the estimated end of the reservation
     
     def __init__(self,args,site):
@@ -310,7 +310,7 @@ class Reservation(threading.Thread):
         print '\n{} motes available:\n{}'.format(len(self.__motes_available),convert_set(self.__motes_available))
         
         # Log to file
-        with open(self.__file_motes_checked,'w') as f:
+        with open(self.__file_motes_available,'w') as f:
             f.write('#ALL {}\n'.format(convert_set(self.__motes_all)))
             f.write('#ALIVE {}\n'.format(convert_set(self.__motes_alive)))
             f.write('#RESERVED {}\n'.format(convert_set(self.__motes_reserved)))
@@ -392,8 +392,6 @@ class Reservation(threading.Thread):
                     break
                 motes_to_test -= self.__get_motes_reachable(motes_to_test)
                 if motes_to_test:
-                    with open(self.__file_motes_working,'a') as f:
-                        f.write('#BEFORERUN_NOTREACHABLE {}\n'.format(convert_set(motes_to_test)))
                     continue
                 return
             self.__motes_working -= motes_not_working
@@ -416,7 +414,7 @@ class Reservation(threading.Thread):
     
     def __openvisualizer_run_trailer(self,update):
         
-        with open(self.__file_motes_known,'a') as f:
+        with open(self.__file_motes_selected,'a') as f:
             f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
             f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))
         if update:
@@ -427,10 +425,10 @@ class Reservation(threading.Thread):
             motes_not_stopped = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
         else:
             motes_not_started = set([])
-            dagroot_not_started = self.__motes_working - self.__send_node_cli_command_to_motes(self.__dagroot,'start')
+            dagroot_not_started = self.__dagroot - self.__send_node_cli_command_to_motes(self.__dagroot,'start')
             motes_not_updated = set([])
-            dagroot_not_updated = self.__motes_working - self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
-            motes_not_stopped = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
+            dagroot_not_updated = self.__dagroot - self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
+            motes_not_stopped = self.__motes_selected - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
         
         motes_not_working = set([])
         with open(self.__file_motes_working,'a') as f:
@@ -624,9 +622,9 @@ class Reservation(threading.Thread):
             if len(self.__motes_working)<self.__args.numMotes:
                 print 'NO SUFFICIENT MOTES: YOU CANNOT RUN SO MANY MOTES IN THIS RESERVATION!'
                 return
-            newMotesSelectedList = not os.path.isfile(self.__file_motes_known)
+            newMotesSelectedList = not os.path.isfile(self.__file_motes_selected)
             if not newMotesSelectedList:
-                with open(self.__file_motes_known) as f:
+                with open(self.__file_motes_selected) as f:
                     lines = f.readlines()
                 for line in lines:
                     tag, motes = line.strip().split()
@@ -653,11 +651,11 @@ class Reservation(threading.Thread):
         
     def __set_reservation_id(self,reservation_id = None):
         self.__reservation_id = reservation_id
-        self.__file_motes_checked = None
+        self.__file_motes_available = None
         self.__file_motes_working = None
-        self.__file_motes_known = None
+        self.__file_motes_selected = None
         if reservation_id:
-            self.__file_motes_checked = os.path.join(self.__dump_directory,self.MOTESCHECKED_PREAMBLE+'_{}.txt'.format(reservation_id))
+            self.__file_motes_available = os.path.join(self.__dump_directory,self.MOTESAVAILABLE_PREAMBLE+'_{}.txt'.format(reservation_id))
             self.__file_motes_working = os.path.join(self.__dump_directory,self.MOTESWORKING_PREAMBLE+'_{}.txt'.format(reservation_id))
             if all(k in self.__args.__dict__ for k in ('numMotes','closeFlag','dagrootCentered')):
                 density = 'far'
@@ -666,8 +664,8 @@ class Reservation(threading.Thread):
                 dagroot_position = 'side'
                 if self.__args.dagrootCentered:
                     dagroot_position = 'center'
-                self.__file_motes_known = os.path.join(self.__dump_directory,
-                            self.MOTESKNOWN_PREAMBLE+'_{}_{}_{}_{}_dagroot.txt'.format(reservation_id,self.__args.numMotes,density,dagroot_position))
+                self.__file_motes_selected = os.path.join(self.__dump_directory,
+                            self.MOTESSELECTED_PREAMBLE+'_{}_{}_{}_{}_dagroot.txt'.format(reservation_id,self.__args.numMotes,density,dagroot_position))
                         
     def __set_reservation_stopping_time(self,reservation_stopping_time):
         self.__reservation_stopping_time = reservation_stopping_time
