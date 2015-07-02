@@ -363,28 +363,28 @@ class Reservation(threading.Thread):
             motes_not_working = set([])
             dagroot_was_updated = False
             while motes_to_test:
-                motes_not_working = motes_to_test - 
+                motes_not_working = motes_to_test - \
                                     self.__send_node_cli_command_to_motes(motes_to_test,'start')
                 if motes_not_working:
                     with open(self.__file_motes_working,'a') as f:
                         f.write('#BEFORERUN_NOTSTARTED {}\n'.format(convert_set(motes_not_working)))
                     break
                 if update:
-                    motes_not_working = motes_to_test - self.__dagroot - 
+                    motes_not_working = motes_to_test - self.__dagroot - \
                                         self.__send_node_cli_command_to_motes(motes_to_test - self.__dagroot,'update',self.__file_firmware_regular)
                     if motes_not_working:
                         with open(self.__file_motes_working,'a') as f:
                             f.write('#BEFORERUN_NOTUPDATED {}\n'.format(convert_set(motes_not_working)))
                         break
                 if not dagroot_was_updated:
-                    motes_not_working = self.__dagroot - 
+                    motes_not_working = self.__dagroot - \
                                         self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_dagroot)
                     dagroot_was_updated = not motes_not_working
                     if motes_not_working:
                         with open(self.__file_motes_working,'a') as f:
                             f.write('#BEFORERUN_DAGROOTNOTUPDATED {}\n'.format(convert_set(motes_not_working)))
                         break
-                motes_not_working = motes_to_test - 
+                motes_not_working = motes_to_test - \
                                     self.__send_node_cli_command_to_motes(motes_to_test,'reset')
                 if motes_not_working:
                     with open(self.__file_motes_working,'a') as f:
@@ -398,13 +398,13 @@ class Reservation(threading.Thread):
                 return
             self.__motes_working -= motes_not_working
             if dagroot_was_updated:
-                motes_not_working = self.__dagroot - 
+                motes_not_working = self.__dagroot - \
                                     self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
                 if motes_not_working:
                     with open(self.__file_motes_working,'a') as f:
                         f.write('#BEFORERUN_DAGROOTNOTUPDATEDBACK {}\n'.format(convert_set(motes_not_working)))
                     self.__motes_working -= motes_not_working
-            motes_not_working = self.__motes_selected - 
+            motes_not_working = self.__motes_selected - \
                                 self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
             if motes_not_working:
                 with open(self.__file_motes_working,'a') as f:
