@@ -409,6 +409,7 @@ class Reservation(threading.Thread):
                 with open(self.__file_motes_working,'a') as f:
                     f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_working)))
             self.__motes_working -= motes_not_working
+            self.__motes_selected.clear()
             with open(self.__file_motes_working,'a') as f:
                 f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
         raise ExperimentSelfTerminating('{} motes working but at least {} must be working'.format(len(self.__motes_working),self.__args.numMotes))
