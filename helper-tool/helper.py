@@ -174,7 +174,7 @@ class Reservation(threading.Thread):
             if self.__args.update:
                 self.__update_openwsn()
                 self.__set_updating()
-            update = self.__is_updating
+            update = self.__is_updating()
             self.__openvisualizer_run_header(update)
             
             print '\nRunning openVisualizer'
@@ -510,34 +510,35 @@ class Reservation(threading.Thread):
             motes_failure -= self.__send_node_cli_command_to_motes(motes_failure,op,op_arg)
         
     def __get_motes_reachable(self,motes_to_test,timeout_read=10,time_to_test=20):
+        motes_responding = set([])
+        error_message = 'While checking reachability'
         if motes_to_test:
             print '\nChecking TCP reachability for:\n{}'.format(convert_set(motes_to_test))
-        motes = dict([(mote,TestReachability(self.__convert_to_url(mote),timeout_read)) for mote in motes_to_test])
-        for mote_thread in motes.itervalues():
-            mote_thread.start()
-        while time_to_test>0:
-            time.sleep(timeout_read)
-            if self.__is_stopping():
-                for mote_thread in motes.itervalues():
-                    mote_thread.stop()
-                for mote_thread in motes.itervalues():
-                    mote_thread.join()
-                raise ReservationStopping(error_message)
-            if self.__is_terminating():
-                for mote_thread in motes.itervalues():
-                    mote_thread.stop()
-                for mote_thread in motes.itervalues():
-                    mote_thread.join()
-                raise ExperimentTerminating(error_message)
-            time_to_test -= timeout_read
-        for mote_thread in motes.itervalues():
-            mote_thread.stop()
-        for mote_thread in motes.itervalues():
-            mote_thread.join()
-        motes_responding = set([])
-        for mote,mote_thread in motes.iteritems():
-            if mote_thread.get_response():
-                motes_responding.add(mote)
+            motes = dict([(mote,TestReachability(self.__convert_to_url(mote),timeout_read)) for mote in motes_to_test])
+            for mote_thread in motes.itervalues():
+                mote_thread.start()
+            while time_to_test>0:
+                time.sleep(timeout_read)
+                if self.__is_stopping():
+                    for mote_thread in motes.itervalues():
+                        mote_thread.stop()
+                    for mote_thread in motes.itervalues():
+                        mote_thread.join()
+                    raise ReservationStopping(error_message)
+                if self.__is_terminating():
+                    for mote_thread in motes.itervalues():
+                        mote_thread.stop()
+                    for mote_thread in motes.itervalues():
+                        mote_thread.join()
+                    raise ExperimentTerminating(error_message)
+                time_to_test -= timeout_read
+            for mote_thread in motes.itervalues():
+                mote_thread.stop()
+            for mote_thread in motes.itervalues():
+                mote_thread.join()
+            for mote,mote_thread in motes.iteritems():
+                if mote_thread.get_response():
+                    motes_responding.add(mote)
         if motes_to_test-motes_responding:
             print '{} motes not working (tcp):\n{}'.format(len(motes_to_test-motes_responding),convert_set(motes_to_test-motes_responding))
         return motes_responding
