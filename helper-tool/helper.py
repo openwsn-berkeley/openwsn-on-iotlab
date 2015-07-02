@@ -392,6 +392,7 @@ class Reservation(threading.Thread):
                     break
                 motes_to_test -= self.__get_motes_reachable(motes_to_test)
                 if motes_to_test:
+                    update = True
                     continue
                 return
             self.__motes_working -= motes_not_working
