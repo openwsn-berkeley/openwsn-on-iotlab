@@ -162,9 +162,6 @@ class Reservation(threading.Thread):
             return
         
         self.__set_running()
-        if self.__args.update:
-            self.__set_updating()
-        update = self.__is_updating()
         reservation_not_running = False
         try:
             if not self.__is_reservation_really_running():
@@ -174,8 +171,10 @@ class Reservation(threading.Thread):
                 if (time_remaining) <= self.RESERVATION_GUARDTIME:
                     raise ReservationSelfStopping('Only {} minutes remaining within this reservation: not sufficient time'.format(time_remaining/60))
                 print '{} minutes remaining within this reservation'.format(time_remaining/60)
-            if update:
+            if self.__args.update:
                 self.__update_openwsn()
+                self.__set_updating()
+            update = self.__is_updating
             self.__openvisualizer_run_header(update)
             
             print '\nRunning openVisualizer'
@@ -192,7 +191,6 @@ class Reservation(threading.Thread):
                 self.__ownership.wait(30)
                 if self.__ownership.is_set():
                     break
-                
             s.stdin.write('q\n')
             s.wait()
             time_remaining = self.__reservation_stopping_time - time.time()
@@ -210,13 +208,10 @@ class Reservation(threading.Thread):
             else:
                 print '\nOpenVisualizer gracefully stopped itself!'
             
-            self.__openvisualizer_run_trailer()
+            self.__openvisualizer_run_trailer(update)
             if self.__is_updating():
                 self.__clear_updating()
-        except (ExperimentTerminating,ExperimentSelfTerminating,CommandError) as e:
-            print e
-            self.__set_updating()
-        except ReservationStopping as e:
+        except (ExperimentTerminating,ExperimentSelfTerminating,CommandError,ReservationStopping) as e:
             print e
         except ReservationSelfStopping as e:
             print e
@@ -361,77 +356,104 @@ class Reservation(threading.Thread):
     
     def __openvisualizer_run_header(self,update):
         
-        if update:
-            motes_started       = self.__send_node_cli_command_to_motes(self.__motes_working,'start')
-            motes_updated       = self.__send_node_cli_command_to_motes(motes_started,'update',self.__file_firmware_regular)
-            motes_stopped_again = self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
-            with open(self.__file_motes_working,'a') as f:
-                f.write('#UPDATE_STARTED {}\n'.format(convert_set(motes_started)))
-                f.write('#UPDATE_UPDATED {}\n'.format(convert_set(motes_updated)))
-                f.write('#UPDATE_STOPPEDAGAIN {}\n'.format(convert_set(motes_stopped_again)))
-            if self.__motes_working - motes_stopped_again:
-                with open(self.__file_motes_working,'a') as f:
-                    f.write('#UPDATE_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(self.__motes_working - motes_stopped_again)))
-                self.__motes_working.clear()
-                self.__motes_working.update(motes_stopped_again & motes_updated)
+        while len(self.__motes_working) >= self.__args.numMotes:
+            if not self.__motes_selected:
                 self.__select_motes_to_run()
-            with open(self.__file_motes_working,'a') as f:
-                f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
-        while True:
-            self.__send_node_cli_command_to_motes(self.__motes_selected,'start')
-            self.__send_node_cli_command_to_motes(self.__motes_selected,'reset')
-            motes_not_reachable = self.__motes_selected - self.__get_motes_reachable(self.__motes_selected)
-            if motes_not_reachable:
-                self.__motes_working -= motes_not_reachable
-                motes_not_stopped = self.__motes_selected - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
-                self.__motes_working -= motes_not_stopped
-                with open(self.__file_motes_working,'a') as f:
-                    if motes_not_stopped:
-                        f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_stopped)))
-                    f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
-                if len(self.__motes_working) >= self.__args.numMotes:
-                    self.__select_motes_to_run()
-                else:
-                    raise ExperimentSelfTerminating('{} motes working but at least {} must be working'.format(len(self.__motes_working),self.__args.numMotes))
-            else:
-                self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_dagroot)
-                self.__send_node_cli_command_to_motes(self.__dagroot,'reset')
-                dagroot_reachable = self.__get_motes_reachable(self.__dagroot)
-                if not dagroot_reachable:
-                    self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
-                    self.__motes_working -= self.__dagroot
-                    motes_not_stopped = self.__motes_selected - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
-                    self.__motes_working -= motes_not_stopped
+            motes_to_test = self.__motes_selected.copy()
+            motes_not_working = set([])
+            dagroot_was_updated = False
+            while motes_to_test:
+                motes_not_working = motes_to_test - 
+                                    self.__send_node_cli_command_to_motes(motes_to_test,'start')
+                if motes_not_working:
                     with open(self.__file_motes_working,'a') as f:
-                        if motes_not_stopped:
-                            f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_stopped)))
-                        f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
-                    if len(self.__motes_working) >= self.__args.numMotes:
-                        self.__select_motes_to_run()
-                    else:
-                        raise ExperimentSelfTerminating('{} motes working but at least {} must be working'.format(len(self.__motes_working),self.__args.numMotes))
-                else:
+                        f.write('#BEFORERUN_NOTSTARTED {}\n'.format(convert_set(motes_not_working)))
                     break
-    
-    def __openvisualizer_run_trailer(self):
-        
-        self.__send_node_cli_command_to_motes(self.__dagroot,'start')
-        dagroot_updated = self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
-        motes_not_stopped = self.__motes_selected - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
-        
-        if dagroot_updated and (not motes_not_stopped):
-            with open(self.__file_motes_known,'a') as f:
-                f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
-                f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))
-        else:
-            if not dagroot_updated:
-                self.__motes_working -= self.__dagroot
-            self.__motes_working -= motes_not_stopped
+                if update:
+                    motes_not_working = motes_to_test - self.__dagroot - 
+                                        self.__send_node_cli_command_to_motes(motes_to_test - self.__dagroot,'update',self.__file_firmware_regular)
+                    if motes_not_working:
+                        with open(self.__file_motes_working,'a') as f:
+                            f.write('#BEFORERUN_NOTUPDATED {}\n'.format(convert_set(motes_not_working)))
+                        break
+                if not dagroot_was_updated:
+                    motes_not_working = self.__dagroot - 
+                                        self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_dagroot)
+                    dagroot_was_updated = not motes_not_working
+                    if motes_not_working:
+                        with open(self.__file_motes_working,'a') as f:
+                            f.write('#BEFORERUN_DAGROOTNOTUPDATED {}\n'.format(convert_set(motes_not_working)))
+                        break
+                motes_not_working = motes_to_test - 
+                                    self.__send_node_cli_command_to_motes(motes_to_test,'reset')
+                if motes_not_working:
+                    with open(self.__file_motes_working,'a') as f:
+                        f.write('#BEFORERUN_NOTRESET {}\n'.format(convert_set(motes_not_working)))
+                    break
+                motes_to_test -= self.__get_motes_reachable(motes_to_test)
+                if motes_to_test:
+                    with open(self.__file_motes_working,'a') as f:
+                        f.write('#BEFORERUN_NOTREACHABLE {}\n'.format(convert_set(motes_to_test)))
+                    continue
+                return
+            self.__motes_working -= motes_not_working
+            if dagroot_was_updated:
+                motes_not_working = self.__dagroot - 
+                                    self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
+                if motes_not_working:
+                    with open(self.__file_motes_working,'a') as f:
+                        f.write('#BEFORERUN_DAGROOTNOTUPDATEDBACK {}\n'.format(convert_set(motes_not_working)))
+                    self.__motes_working -= motes_not_working
+            motes_not_working = self.__motes_selected - 
+                                self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
+            if motes_not_working:
+                with open(self.__file_motes_working,'a') as f:
+                    f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_working)))
+            self.__motes_working -= motes_not_working
             with open(self.__file_motes_working,'a') as f:
-                if motes_not_stopped:
-                    f.write('#AFTERRUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_stopped)))
                 f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
-                
+        raise ExperimentSelfTerminating('{} motes working but at least {} must be working'.format(len(self.__motes_working),self.__args.numMotes))
+    
+    def __openvisualizer_run_trailer(self,update):
+        
+        with open(self.__file_motes_known,'a') as f:
+            f.write('#SELECTED {}\n'.format(convert_set(self.__motes_selected)))
+            f.write('#DAGROOT {}\n'.format(convert_set(self.__dagroot)))1
+        if update:
+            motes_not_started = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_working,'start')
+            dagroot_not_started = set([])
+            motes_not_updated = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_working,'update',self.__file_firmware_regular)
+            dagroot_not_updated = set([])
+            motes_not_stopped = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
+        else:
+            motes_not_started = set([])
+            dagroot_not_started = self.__motes_working - self.__send_node_cli_command_to_motes(self.__dagroot,'start')
+            motes_not_updated = set([])
+            dagroot_not_updated = self.__motes_working - self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_regular)
+            motes_not_stopped = self.__motes_working - self.__send_node_cli_command_to_motes(self.__motes_selected,'stop')
+        
+        motes_not_working = set([])
+        with open(self.__file_motes_working,'a') as f:
+            if motes_not_started:
+                motes_not_working |= motes_not_started
+                f.write('#AFTERRUN_NOTSTARTED {}\n'.format(convert_set(motes_not_started)))
+            if dagroot_not_started:
+                motes_not_working |= dagroot_not_started
+                f.write('#AFTERRUN_DAGROOTNOTSTARTED {}\n'.format(convert_set(dagroot_not_started)))
+            if motes_not_updated:
+                motes_not_working |= motes_not_updated
+                f.write('#AFTERRUN_NOTUPDATED {}\n'.format(convert_set(motes_not_updated)))
+            if dagroot_not_updated:
+                motes_not_working |= dagroot_not_updated
+                f.write('#AFTERRUN_DAGROOTNOTUPDATEDBACK {}\n'.format(convert_set(dagroot_not_updated)))
+            if motes_not_stopped:
+                motes_not_working |= motes_not_stopped
+                f.write('#AFTERRUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_stopped)))
+        self.__motes_working -= motes_not_working
+        if motes_not_working:
+            with open(self.__file_motes_working,'a') as f:
+                f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
+        
     def __update_openwsn(self):
         
         os.chdir(os.path.join(self.__working_directory,'..','openwsn-fw'))
