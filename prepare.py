@@ -9,9 +9,7 @@ import shutil
 PYTHON_RELEASE = ['2','7','8']
 
 FIRMWARE_REPOSITORY     = 'https://github.com/openwsn-berkeley/openwsn-fw.git'
-FIRMWARE_BRANCH         = 'develop'
 SOFTWARE_REPOSITORY     = 'https://github.com/openwsn-berkeley/openwsn-sw.git'
-SOFTWARE_BRANCH         = 'develop'
 
 FIRMWARE_PATH           = '"build/wsn430v14_mspgcc/projects/common/03oos_openwsn_prog.ihex"'
 
@@ -34,22 +32,22 @@ def parse_options():
     parser = argparse.ArgumentParser()
     
     parser.add_argument('-fr','--firmwareRepository',
-                        default     = FIRMWARE_REPOSITORY,
+                        default     = None,
                         help        = 'sets the git remote repository to track for openwsn-fw',
                         )
     
     parser.add_argument('-fb','--firmwareBranch',
-                        default     = FIRMWARE_BRANCH,
+                        default     = None,
                         help        = 'sets the git branch to track for openwsn-fw',
                         )
     
     parser.add_argument('-sr','--softwareRepository',
-                        default     = SOFTWARE_REPOSITORY,
+                        default     = None,
                         help        = 'sets the git remote repository to track for openwsn-sw',
                         )
     
     parser.add_argument('-sb','--softwareBranch',
-                        default     = SOFTWARE_BRANCH,
+                        default     = None,
                         help        = 'sets the git branch to track for openwsn-sw',
                         )
     
@@ -129,23 +127,77 @@ def install(args):
     # git clone openwsn-fw and openwsn-sw; switch branches if required
     
     os.chdir(openwsn_on_iotlab_parentdir)
-    if os.path.exists(openwsn_fw_dir):
-        if args.firmwareRepository != FIRMWARE_REPOSITORY:
-            shutil.rmtree(openwsn_fw_dir)
-    if not os.path.exists(openwsn_fw_dir):
-        subprocess.call(['git','clone',args.firmwareRepository])
-    if args.firmwareBranch != FIRMWARE_BRANCH:
+    if args.firmwareRepository is None:
+        if not os.path.exists(openwsn_fw_dir):
+            subprocess.call(['git','clone',FIRMWARE_REPOSITORY])
+    else:
+        if not os.path.exists(openwsn_fw_dir):
+            subprocess.call(['git','clone',args.firmwareRepository])
+        else:
+            os.chdir(openwsn_fw_dir)
+            s = subprocess.Popen(['git','remote','-v'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            stdout,stderr = s.communicate()
+            if stderr:
+                print stderr
+                return
+            if args.firmwareRepository != stdout.splitlines()[0].split('\t')[1].split()[0]:
+                os.chdir(openwsn_on_iotlab_parentdir)
+                shutil.rmtree(openwsn_fw_dir)
+                subprocess.call(['git','clone',args.firmwareRepository])
+    if args.firmwareBranch:
         os.chdir(openwsn_fw_dir)
-        subprocess.call(['git','checkout','-b',args.firmwareBranch,'origin/{0}'.format(args.firmwareBranch)])
+        s = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        stdout,stderr = s.communicate()
+        branches = stdout.split(None)
+        other_branches = []
+        current_branch = None
+        while branches:
+            branch = branches.pop(0)
+            if branch == '*':
+                current_branch = branches.pop(0)
+            else:
+                other_branches.append(branch)
+        if not (args.firmwareBranch is current_branch):
+            if args.firmwareBranch is in other_branches:
+                subprocess.call(['git','checkout',args.firmwareBranch])
+            else:
+                subprocess.call(['git','checkout','-b',args.firmwareBranch,'origin/{0}'.format(args.firmwareBranch)])
     os.chdir(openwsn_on_iotlab_parentdir)
-    if os.path.exists(openwsn_sw_dir):
-        if args.softwareRepository != SOFTWARE_REPOSITORY:
-            shutil.rmtree(openwsn_sw_dir)
-    if not os.path.exists(openwsn_sw_dir):
-        subprocess.call(['git','clone',args.softwareRepository])
-    if args.softwareBranch != SOFTWARE_BRANCH:
+    if args.softwareRepository is None:
+        if not os.path.exists(openwsn_sw_dir):
+            subprocess.call(['git','clone',SOFTWARE_REPOSITORY])
+    else:
+        if not os.path.exists(openwsn_sw_dir):
+            subprocess.call(['git','clone',args.softwareRepository])
+        else:
+            os.chdir(openwsn_sw_dir)
+            s = subprocess.Popen(['git','remote','-v'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            stdout,stderr = s.communicate()
+            if stderr:
+                print stderr
+                return
+            if args.softwareRepository != stdout.splitlines()[0].split('\t')[1].split()[0]:
+                os.chdir(openwsn_on_iotlab_parentdir)
+                shutil.rmtree(openwsn_sw_dir)
+                subprocess.call(['git','clone',args.softwareRepository])
+    if args.softwareBranch:
         os.chdir(openwsn_sw_dir)
-        subprocess.call(['git','checkout','-b',args.softwareBranch,'origin/{0}'.format(args.softwareBranch)])
+        s = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        stdout,stderr = s.communicate()
+        branches = stdout.split(None)
+        other_branches = []
+        current_branch = None
+        while branches:
+            branch = branches.pop(0)
+            if branch == '*':
+                current_branch = branches.pop(0)
+            else:
+                other_branches.append(branch)
+        if not (args.softwareBranch is current_branch):
+            if args.softwareBranch is in other_branches:
+                subprocess.call(['git','checkout',args.softwareBranch])
+            else:
+                subprocess.call(['git','checkout','-b',args.softwareBranch,'origin/{0}'.format(args.softwareBranch)])
     
     # install python libraries required
     
