@@ -48,7 +48,6 @@ class Reservation(threading.Thread):
     RUNNING                 = '.RUNNING'
     TERMINATING             = '.TERMINATING'
     UPDATING                = '.UPDATING'
-    INCONSISTENT            = '.INCONSISTENT'
     MOTESAVAILABLE_PREAMBLE = 'motes_available'
     MOTESWORKING_PREAMBLE   = 'motes_working'
     MOTESSELECTED_PREAMBLE  = 'motes_selected'
@@ -84,7 +83,6 @@ class Reservation(threading.Thread):
         self.__file_running             = os.path.join(self.__working_directory,self.RUNNING)
         self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING)
         self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING)
-        self.__file_inconsistent        = os.path.join(self.__working_directory,self.INCONSISTENT)
         self.__reset_variables()
         self.__decide_ownership()
         threading.Thread.__init__(self)
@@ -772,16 +770,6 @@ class Reservation(threading.Thread):
         
     def __clear_updating(self):
         os.remove(self.__file_updating)
-    
-    def __is_inconsistent(self):
-        return os.path.isfile(self.__file_inconsistent)
-    
-    def __set_inconsistent(self):
-        with open(self.__file_inconsistent,'w') as f:
-            f.write('')
-        
-    def __clear_inconsistent(self):
-        os.remove(self.__file_inconsistent)
     
 class TestReachability(threading.Thread):
     def __init__(self, mote,timeout):
