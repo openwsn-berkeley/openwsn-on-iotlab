@@ -356,12 +356,14 @@ class Reservation(threading.Thread):
     
     def __openvisualizer_run_header(self,update):
         
+        select_again = False
         while len(self.__motes_working) >= self.__args.numMotes:
-            if not self.__motes_selected:
+            if not select_again:
                 self.__select_motes_to_run()
             motes_to_test = self.__motes_selected.copy()
             motes_not_working = set([])
             dagroot_was_updated = False
+            update_dagroot = True
             while motes_to_test:
                 motes_not_working = motes_to_test - \
                                     self.__send_node_cli_command_to_motes(motes_to_test,'start')
@@ -376,7 +378,8 @@ class Reservation(threading.Thread):
                         with open(self.__file_motes_working,'a') as f:
                             f.write('#BEFORERUN_NOTUPDATED {}\n'.format(convert_set(motes_not_working)))
                         break
-                if not dagroot_was_updated:
+                if not dagroot_was_updated or update_dagroot:
+                    update_dagroot = False
                     motes_not_working = self.__dagroot - \
                                         self.__send_node_cli_command_to_motes(self.__dagroot,'update',self.__file_firmware_dagroot)
                     dagroot_was_updated = not motes_not_working
@@ -390,10 +393,19 @@ class Reservation(threading.Thread):
                     with open(self.__file_motes_working,'a') as f:
                         f.write('#BEFORERUN_NOTRESET {}\n'.format(convert_set(motes_not_working)))
                     break
-                motes_to_test -= self.__get_motes_reachable(motes_to_test)
-                if motes_to_test:
-                    update = True
-                    continue
+                motes_not_working = motes_to_test - \
+                                    self.__get_motes_reachable(motes_to_test)
+                if motes_not_working:
+                    if motes_to_test - motes_not_working:
+                        motes_to_test = motes_not_working.copy()
+                        update = True
+                        if self.__dagroot & motes_to_test:
+                            update_dagroot = True
+                        continue
+                    else:
+                        with open(self.__file_motes_working,'a') as f:
+                            f.write('#BEFORERUN_NOTREACHABLE {}\n'.format(convert_set(motes_not_working)))
+                        break
                 return
             self.__motes_working -= motes_not_working
             if dagroot_was_updated:
@@ -409,7 +421,7 @@ class Reservation(threading.Thread):
                 with open(self.__file_motes_working,'a') as f:
                     f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_working)))
             self.__motes_working -= motes_not_working
-            self.__motes_selected.clear()
+            select_again = True
             with open(self.__file_motes_working,'a') as f:
                 f.write('#WORKING {}\n'.format(convert_set(self.__motes_working)))
         raise ExperimentSelfTerminating('{} motes working but at least {} must be working'.format(len(self.__motes_working),self.__args.numMotes))
@@ -500,8 +512,8 @@ class Reservation(threading.Thread):
             motes_dict = json.loads(stdout)
             if motes_dict.has_key('0'):
                 motes_successful = set([self.__convert_to_id(mote) for mote in motes_dict['0']])
-                if motes-motes_successful:
-                    print '{} motes not working ({}):\n{}'.format(len(motes-motes_successful),op,convert_set(motes-motes_successful))
+            if motes-motes_successful:
+                print '{} motes not working ({}):\n{}'.format(len(motes-motes_successful),op,convert_set(motes-motes_successful))
         return motes_successful
     
     def __loop_send_node_cli_command_to_motes(self,motes,op,op_arg=None):
