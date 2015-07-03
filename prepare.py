@@ -194,7 +194,7 @@ def install(args):
             else:
                 other_branches.append(branch)
         if not (args.softwareBranch is current_branch):
-            if args.softwareBranch is in other_branches:
+            if args.softwareBranch in other_branches:
                 subprocess.call(['git','checkout',args.softwareBranch])
             else:
                 subprocess.call(['git','checkout','-b',args.softwareBranch,'origin/{0}'.format(args.softwareBranch)])
