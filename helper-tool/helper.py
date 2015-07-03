@@ -48,6 +48,7 @@ class Reservation(threading.Thread):
     RUNNING                 = '.RUNNING'
     TERMINATING             = '.TERMINATING'
     UPDATING                = '.UPDATING'
+    INCONSISTENT            = '.INCONSISTENT'
     MOTESAVAILABLE_PREAMBLE = 'motes_available'
     MOTESWORKING_PREAMBLE   = 'motes_working'
     MOTESSELECTED_PREAMBLE  = 'motes_selected'
@@ -83,6 +84,7 @@ class Reservation(threading.Thread):
         self.__file_running             = os.path.join(self.__working_directory,self.RUNNING)
         self.__file_terminating         = os.path.join(self.__working_directory,self.TERMINATING)
         self.__file_updating            = os.path.join(self.__working_directory,self.UPDATING)
+        self.__file_inconsistent        = os.path.join(self.__working_directory,self.INCONSISTENT)
         self.__reset_variables()
         self.__decide_ownership()
         threading.Thread.__init__(self)
@@ -211,7 +213,10 @@ class Reservation(threading.Thread):
             self.__openvisualizer_run_trailer(update)
             if self.__is_updating():
                 self.__clear_updating()
-        except (ExperimentTerminating,ExperimentSelfTerminating,CommandError,ReservationStopping) as e:
+        except (ExperimentTerminating,CommandError) as e:
+            print e
+            self.__set_updating()
+        except (ExperimentSelfTerminating,ReservationStopping) as e:
             print e
         except ReservationSelfStopping as e:
             print e
@@ -357,8 +362,17 @@ class Reservation(threading.Thread):
     def __openvisualizer_run_header(self,update):
         
         select_again = False
+        if update:
+            motes_not_working = self.__motes_working - \
+                                self.__send_node_cli_command_to_motes(self.__motes_working,'stop')
+            if motes_not_working:
+                with open(self.__file_motes_working,'a') as f:
+                    f.write('#BEFORERUN_POSSIBLYNOTSTOPPED {}\n'.format(convert_set(motes_not_working)))
+                self.__motes_working -= motes_not_working
+                select_again = True
+        
         while len(self.__motes_working) >= self.__args.numMotes:
-            if not select_again:
+            if select_again:
                 self.__select_motes_to_run()
             motes_to_test = self.__motes_selected.copy()
             motes_not_working = set([])
@@ -758,6 +772,16 @@ class Reservation(threading.Thread):
         
     def __clear_updating(self):
         os.remove(self.__file_updating)
+    
+    def __is_inconsistent(self):
+        return os.path.isfile(self.__file_inconsistent)
+    
+    def __set_inconsistent(self):
+        with open(self.__file_inconsistent,'w') as f:
+            f.write('')
+        
+    def __clear_inconsistent(self):
+        os.remove(self.__file_inconsistent)
     
 class TestReachability(threading.Thread):
     def __init__(self, mote,timeout):
