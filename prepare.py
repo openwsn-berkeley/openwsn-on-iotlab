@@ -146,6 +146,7 @@ def install(args):
                 subprocess.call(['git','clone',args.firmwareRepository])
     if args.firmwareBranch:
         os.chdir(openwsn_fw_dir)
+        subprocess.call(['git','fetch'])
         s = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         stdout,stderr = s.communicate()
         branches = stdout.split(None)
@@ -182,6 +183,7 @@ def install(args):
                 subprocess.call(['git','clone',args.softwareRepository])
     if args.softwareBranch:
         os.chdir(openwsn_sw_dir)
+        subprocess.call(['git','fetch'])
         s = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         stdout,stderr = s.communicate()
         branches = stdout.split(None)
