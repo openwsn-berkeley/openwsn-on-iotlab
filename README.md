@@ -1,6 +1,7 @@
 # openwsn-on-iotlab
-Installation:
--------------
+
+Installation
+------------
 
 ssh to one iot-lab-deployment with `your-account`:
 
@@ -18,8 +19,8 @@ cd openwsn-on-iotlab
 ./prepare.py
 ```
 
-Start a reservation:
---------------------
+Start a reservation
+-------------------
 
 Default commands will reserve 20 wsn430:cc2420 motes on the selected iot-lab-deployment
 
@@ -27,8 +28,8 @@ Default commands will reserve 20 wsn430:cc2420 motes on the selected iot-lab-dep
 ./openwsn-on-iotlab start
 ```
 
-Run OpenWSN:
---------------
+Run OpenWSN
+-----------
 
 Default commands will enable 10 motes among the 20 reserved
 
@@ -36,8 +37,8 @@ Default commands will enable 10 motes among the 20 reserved
 ./openwsn-on-iotlab run
 ```
 
-Terminate OpenWSN:
-------------------
+Terminate OpenWSN
+-----------------
 
 Press Ctrl-C or, in another shell, run:
 
@@ -45,8 +46,8 @@ Press Ctrl-C or, in another shell, run:
 ./openwsn-on-iotlab terminate
 ```
 
-Stop the reservation:
----------------------
+Stop the reservation
+--------------------
 
 ```
 ./openwsn-on-iotlab stop
