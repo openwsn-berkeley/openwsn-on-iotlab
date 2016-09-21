@@ -3,6 +3,8 @@ import struct
 import os
 import time
 from collections import namedtuple
+import sys
+sys.path.append(os.path.abspath('../experiment'))
 import OpenHdlc
 import traceback
 import StackDefines
