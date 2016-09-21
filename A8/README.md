@@ -1,22 +1,21 @@
-# 100 nodes on IoT-Lab
+# OpenWSN on IoT-Lab A8-M3 nodes
 
-This repository contains all related tools, documentation for building a 100 ([A8-M3 ](https://www.iot-lab.info/hardware/a8/)) nodes network on [IoT-Lab](https://www.iot-lab.info).
+This repository contains all related tools, documentation how to build a 100 ([A8-M3 ](https://www.iot-lab.info/hardware/a8/)) nodes network on [IoT-Lab](https://www.iot-lab.info).
 
 ## Repository structure 
 
 - **experiement**
 	-  ***exp_submit.py***, for submitting a new experiment
-	-  ***flash.py***, for flashing multiple A8-M3 nodes
 	-  ***install.py***, for installing dependency software to run OpenVisualizer
--  **serialData**
-	-  ***killall_python*** for killing the python process running on A8-M3 nodes
 	-  ***moteProbe.py***, for gathering serial data from A8-M3 nodes
 	-  ***OpenHdlc.py***, for parsing HDLC format serial data from A8-M3 nodes
-	-  ***runMoteProbe_multiple.py***, for running moteProbe.py on multiple A8-M3 nodes
+	-  ***cmd_multpleNode.py***, for running commands remotely on multiple A8-M3 nodes
 	-  ***runov.py***, for running OpenVisualizer on a given A8-M3 node and port
-- **notes.pptx**, for taking notes (TBD)
+- **parser**
+    -  ***parser.py***, for parsing serial data to readable content
+    -  ***StackDefines.py***, description of stack defines
 
-## Schedule experiment with multiple nodes on IoT-Lab
+## Schedule experiment with multiple A8-M3 nodes on IoT-Lab
 
 ### login to IoT-Lab
 
