@@ -12,6 +12,7 @@ commandList   = {
 'flash'     :'flash_a8_m3 A8/03oos_openwsn_prog.exe',
 'moteprobe' :'cd ~/A8/experiment/; python moteProbe.py &',
 'killpython':'killall python',
+'watchdog'  :'cd ~/A8/experiment/; python watchdog.py &',
 }
 
 # =========================== functions =======================================
@@ -23,10 +24,11 @@ def syscall(cmd):
 def usage():
     output = "issue commands to multiple nodes\n"
     output += "issue_command.py -c <command> -s <startNodeId> -e <endNoteId>\n"
-    output += "---- shortCMD    real command\n"
+    output += "---- shortCMD   real command\n"
     output += "---- flash      flash_a8_m3 A8/03oos_openwsn_prog.exe\n"
     output += "---- moteprobe  cd ~/A8/serialData/; python moteProbe.py &\n"
     output += "---- killpython killall python\n"
+    output += "---- watchdog   cd ~/A8/experiment/; python watchdog.py &\n"
     output += "(you also can type the command directly)\n"
     print output
     
