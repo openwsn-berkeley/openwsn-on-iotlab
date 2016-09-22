@@ -27,10 +27,9 @@ Use ssh/putty to login in to IoT-Lab. You can refer [here](https://www.iot-lab.i
 
 Copy all scripts in the repository to IoT-Lab. You can use SCP to copy all scripts to IoT-Lab.
 	
-	C:\Users\Tengfei> git clone https://tengfeic@bitbucket.org/tengfeic/100-nodes-network.git
-	C:\Users\Tengfei> cd 100-nodes-network
+	C:\Users\Tengfei> git clone https://github.com/openwsn-berkeley/openwsn-on-iotlab.git
+	C:\Users\Tengfei> cd openwsn-on-iotlab/A8
 	C:\Users\Tengfei> scp -r experiment/* <username>@saclay.iot-lab.info:~/A8/
-	C:\Users\Tengfei> scp -r serialData/* <username>@saclay.iot-lab.info:~/A8/
 
 Git clone Openvisualizer on IoT-Lab server: [https://github.com/openwsn-berkeley/openwsn-sw/tree/develop_FW-548](https://github.com/openwsn-berkeley/openwsn-sw/tree/develop_FW-548)
 
