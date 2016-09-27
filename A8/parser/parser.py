@@ -265,12 +265,14 @@ class LogfileParser(object):
             pass
         return payload
     def parse_INFO(self,frame):
-        pass
+        payload    = self.parseHeader(frame[:8],'<HBBHH',('moteID','component','errcode','arg1','arg2'))
+        return payload
     def parse_ERROR(self,frame):
         payload    = self.parseHeader(frame[:8],'<HBBHH',('moteID','component','errcode','arg1','arg2'))
         return payload
     def parse_CRITICAL(self,frame):
-        pass
+        payload    = self.parseHeader(frame[:8],'<HBBHH',('moteID','component','errcode','arg1','arg2'))
+        return payload
     def parse_REQUEST(self,frame):
         pass
     
