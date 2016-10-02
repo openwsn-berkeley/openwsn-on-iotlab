@@ -10,8 +10,18 @@ import traceback
 import StackDefines
 import pprint
 
-LOGFILE_PATH = '52229/'
+#============================ defines =========================================
+LOGFILE_PATH              = '52838/'
 
+CELLTYPE_OFF              = 0
+CELLTYPE_TX               = 1
+CELLTYPE_RX               = 2
+CELLTYPE_TXRX             = 3
+
+SLOTFRAME_LENGTH          = 101
+
+
+#============================ class ===========================================
 class fieldParsingKey(object):
     def __init__(self,length,val,name,structure,fields):
         self.length      = length
@@ -19,6 +29,13 @@ class fieldParsingKey(object):
         self.name       = name
         self.structure  = structure
         self.fields     = fields
+
+class getFigureData(object):
+    def __init__():
+        self.scheduletable  = {}
+        self.syncTime       = {}
+        self.cellUsage      = {}
+        self.cellPDR        = {}
 
 class LogfileParser(object):
     
@@ -28,119 +45,76 @@ class LogfileParser(object):
     HDLC_ESCAPE_ESCAPED    = '\x5d'
     
     def __init__(self):
-        
+
+        self.scheduletable  = {}
+        self.syncTime       = {}
+        self.cellUsage      = {}
+        self.cellPDR        = {}
+        self.moteAddress    = {}
         # parse
-        alldata = self.parseAllFiles()
-        
-        # analyze
-        allflatdata = []
-        for (k,v) in alldata.items():
-            allflatdata += v
-        
-        # question 1: are all preferred parents stable neighbors?
-        output = []
-        for d in allflatdata:
-            if 'parentPreference' in d:
-                if d['parentPreference']==2:
-                    output += [ 'rssi={0} stableNeighbor={1}'.format(d['rssi'],d['stableNeighbor'])]
-        with open('question_1.txt','w') as f:
-            f.write('\n'.join(output))
-        
-        # question 2: how many errors?
-        errorcount = {}
-        for d in allflatdata:
-            if 'errcode' in d:
-                errstring = StackDefines.errorDescriptions[d['errcode']]
-                if errstring not in errorcount:
-                    errorcount[errstring] = 0
-                errorcount[errstring] += 1
-        with open('question_2.txt','w') as f:
+        self.parseAllFiles()
+
+    # get figure data
+    def getFigure1Data(self,moteid,oneFileData):
+        self.scheduletable[moteid] = {}
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                self.scheduletable[moteid][d['row']] = d
+            if 'myDAGrank' in d:
+                self.scheduletable[moteid]['myDAGrank']= d
+    def getFigure2Data(self,moteid,oneFileData):
+        self.syncTime[moteid] = {}
+        isSynced = False
+        for d in oneFileData:
+            if 'isSync' in d and d['isSync'] == 1:
+                isSynced = True
+            if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
+                    self.syncTime[moteid] = d
+                    break    
+    def getFigure3Data(self,moteid,oneFileData):
+        self.cellUsage[moteid] = []
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                if d['type'] == CELLTYPE_TX:
+                    self.cellUsage[moteid] += [(d['slotOffset'],countOneInBinary(d['usageBitMap']))]
+
+    def getFigure4Data(self,moteid,oneFileData):
+        self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                if d['type'] == CELLTYPE_TX:
+                    if d['numTx'] != 0:
+                        self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
+
+    def getMoteAddress(self,moteid,oneFileData):
+        self.moteAddress[moteid] = {}
+        for d in oneFileData:
+            if 'my16bID' in d:
+                self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
+
+    def writeToFile(self,filename,data):
+        with open(filename,'w') as f:
             pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(errorcount))
-            
-        # question 3: last neighbor table of each mote
-        neighbortable = {}
-        for (moteid,data) in alldata.items():
-            neighbortable[moteid] = {}
-            for d in data:
-                if 'parentPreference' in d:
-                    if d['used']==1:
-                        neighbortable[moteid][d['row']] = d
-        with open('question_3.txt','w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(neighbortable))
-        
-        # question 4: rssi histogram
-        rssivals = {}
-        for (moteid,data) in neighbortable.items():
-            rssivals[moteid] = []
-            for (_,v) in data.items():
-                
-                rssivals[moteid] += [(v['addr_128b_6'],v['addr_128b_7'],v['rssi'])]
-        with open('question_4.txt','w') as f:
-            output = []
-            for (k,v) in rssivals.items():
-                output += ['{0}: {1}'.format(k,sorted(v))]
-            f.write('\n'.join(output))
-        
-        # question 5: network churn
-        
-        # question 6: node id address mapping
-        idAddressMapping = {}
-        for (moteid,data) in alldata.items():
-            idAddressMapping[moteid] = {}
-            for d in data:
-                if 'my16bID' in d:
-                    d['my16bID'] = hex(d['my16bID'])
-                    idAddressMapping[moteid] = d
-                    break
-        with open('question_6.txt','w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(idAddressMapping))
-            
-        # question 7: how many nodes sych-ed ever
-        nodelist = {}
-        for (moteid,data) in alldata.items():
-            nodelist[moteid] = []
-            for d in data:
-                if 'isSync' in d and d['isSync']==1:
-                    nodelist[moteid] += d
-                    break
-        with open('question_7.txt','w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(nodelist))
-            
-        # question 8: the latest activity of nodes
-        asnvals = {}
-        for (moteid,data) in alldata.items():
-            asnvals[moteid] = []
-            for d in data:
-                if 'asn_0_1' in d and not('stableNeighbor' in d):
-                    asnvals[moteid] = [(d['asn_0_1'],d['asn_2_3'],d['asn_4'])]
-        with open('question_8.txt','w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(asnvals))
-            
-        # question 9: myDAGrank
-        rankvals = {}
-        for (moteid,data) in alldata.items():
-            rankvals[moteid] = []
-            for d in data:
-                if 'myDAGrank' in d:
-                    rankvals[moteid] += [(d['myDAGrank'])]
-        with open('question_9.txt','w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(rankvals))
-        
+            f.write(pp.pformat(data))
+    
+    # parse all files
     def parseAllFiles(self):
-        alldata = {}
         for filename in os.listdir(LOGFILE_PATH):
             if filename.endswith('.log'):
                 print 'Parsing {0}...'.format(filename),
-                alldata[filename] = self.parseOneFile(LOGFILE_PATH+filename)
+                parsedFrames = self.parseOneFile(LOGFILE_PATH+filename)
+                self.getFigure1Data(filename,parsedFrames)
+                self.getFigure2Data(filename,parsedFrames)
+                self.getFigure3Data(filename,parsedFrames)
+                self.getFigure4Data(filename,parsedFrames)
+                self.getMoteAddress(filename,parsedFrames)
                 print 'done.'
-        return alldata
-    
+        self.writeToFile('figure_1_schedule_vs_rank.txt',self.scheduletable)
+        self.writeToFile('figure_2_syncTime_vs_numberMotes.txt',self.syncTime)
+        self.writeToFile('figure_3_cellUsage_vs_numberCells.txt',self.cellUsage)
+        self.writeToFile('figure_4_cellPDR.txt',self.cellPDR)
+        self.writeToFile('moteAddress_map.txt',self.moteAddress)
+
     def parseOneFile(self,filename):
         self.hdlc  = OpenHdlc.OpenHdlc()
         (hdlcFrames,_) = self.hdlc.dehdlcify(filename)
@@ -204,7 +178,7 @@ class LogfileParser(object):
         elif header['type']==6: # ScheduleRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BHBBBBQQBBBBHH',
+                '<BHBBBBQQBBBBHHHB',
                 (
                     'row',                       # B
                     'slotOffset',                # H 
@@ -220,6 +194,8 @@ class LogfileParser(object):
                     'lastUsedAsn_4',             # B
                     'lastUsedAsn_2_3',           # H
                     'lastUsedAsn_0_1',           # H
+                    'usageBitMap',               # H
+                    'bitMapIndex',               # B
                 ),
             )
         elif header['type']==9: # NeighborsRow
@@ -297,5 +273,15 @@ def main():
         print traceback.print_exc()
         raw_input("Script CRASHED. Press Enter to close.")
 
+#============================ helper ==========================================
+
+def countOneInBinary(number):
+    count = 0
+    while (number>0):
+        count   = count+1;
+        number  = number & (number-1);
+        
+    return count
+        
 if __name__ == "__main__":
     main()
