@@ -53,49 +53,6 @@ class LogfileParser(object):
         self.moteAddress    = {}
         # parse
         self.parseAllFiles()
-
-    # get figure data
-    def getFigure1Data(self,moteid,oneFileData):
-        self.scheduletable[moteid] = {}
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                self.scheduletable[moteid][d['row']] = d
-            if 'myDAGrank' in d:
-                self.scheduletable[moteid]['myDAGrank']= d
-    def getFigure2Data(self,moteid,oneFileData):
-        self.syncTime[moteid] = {}
-        isSynced = False
-        for d in oneFileData:
-            if 'isSync' in d and d['isSync'] == 1:
-                isSynced = True
-            if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
-                    self.syncTime[moteid] = d
-                    break    
-    def getFigure3Data(self,moteid,oneFileData):
-        self.cellUsage[moteid] = []
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['type'] == CELLTYPE_TX:
-                    self.cellUsage[moteid] += [(d['slotOffset'],countOneInBinary(d['usageBitMap']))]
-
-    def getFigure4Data(self,moteid,oneFileData):
-        self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['type'] == CELLTYPE_TX:
-                    if d['numTx'] != 0:
-                        self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
-
-    def getMoteAddress(self,moteid,oneFileData):
-        self.moteAddress[moteid] = {}
-        for d in oneFileData:
-            if 'my16bID' in d:
-                self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
-
-    def writeToFile(self,filename,data):
-        with open(filename,'w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(data))
     
     # parse all files
     def parseAllFiles(self):
@@ -109,11 +66,11 @@ class LogfileParser(object):
                 self.getFigure4Data(filename,parsedFrames)
                 self.getMoteAddress(filename,parsedFrames)
                 print 'done.'
-        self.writeToFile('figure_1_schedule_vs_rank.txt',self.scheduletable)
-        self.writeToFile('figure_2_syncTime_vs_numberMotes.txt',self.syncTime)
-        self.writeToFile('figure_3_cellUsage_vs_numberCells.txt',self.cellUsage)
+        self.writeToFile('figure_1_schedule&rank.txt',self.scheduletable)
+        self.writeToFile('figure_2_syncTime.txt',self.syncTime)
+        self.writeToFile('figure_3_cellUsage.txt',self.cellUsage)
         self.writeToFile('figure_4_cellPDR.txt',self.cellPDR)
-        self.writeToFile('moteAddress_map.txt',self.moteAddress)
+        self.writeToFile('moteAddressId_mapping.txt',self.moteAddress)
 
     def parseOneFile(self,filename):
         self.hdlc  = OpenHdlc.OpenHdlc()
@@ -253,6 +210,56 @@ class LogfileParser(object):
         pass
     
     #======================== level 2 parsers =================================
+    
+    # get figure data
+    def getFigure1Data(self,moteid,oneFileData):
+        self.scheduletable[moteid] = {}
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                self.scheduletable[moteid][d['row']] = d
+            if 'myDAGrank' in d:
+                self.scheduletable[moteid]['myDAGrank']= d
+    def getFigure2Data(self,moteid,oneFileData):
+        self.syncTime[moteid] = {}
+        isSynced = False
+        for d in oneFileData:
+            if 'isSync' in d and d['isSync'] == 1:
+                isSynced = True
+            if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
+                    self.syncTime[moteid] = d
+                    break    
+    def getFigure3Data(self,moteid,oneFileData):
+        self.cellUsage[moteid] = []
+        slotFrameCount         = 0
+        cellusagePerSlotFrame  = 0
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                if d['slotOffset'] == 0:
+                    self.cellUsage[moteid] += [(slotFrameCount,cellusagePerSlotFrame)]
+                    cellusagePerSlotFrame   = 0
+                    slotFrameCount         += 1
+                    break
+                if d['type'] == CELLTYPE_TX:
+                    cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
+
+    def getFigure4Data(self,moteid,oneFileData):
+        self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
+        for d in oneFileData:
+            if 'slotOffset' in d:
+                if d['type'] == CELLTYPE_TX:
+                    if d['numTx'] != 0:
+                        self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
+
+    def getMoteAddress(self,moteid,oneFileData):
+        self.moteAddress[moteid] = {}
+        for d in oneFileData:
+            if 'my16bID' in d:
+                self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
+
+    def writeToFile(self,filename,data):
+        with open(filename,'w') as f:
+            pp = pprint.PrettyPrinter(indent=4)
+            f.write(pp.pformat(data))
     
     #======================== helpers =========================================
     
