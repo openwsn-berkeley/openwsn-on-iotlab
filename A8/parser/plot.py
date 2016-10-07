@@ -51,6 +51,7 @@ class plotFigure():
         plt.figure(1)
         xData = []
         yData = []
+        totalCells = 0
         for moteid, data in self.figureData['figure_1_schedule&rank.txt'].items():
             numberOfCell = 0
             for i in range(23): # 23 cells buffer entries 
@@ -58,20 +59,25 @@ class plotFigure():
                     numberOfCell += 1
             xData += [data['myDAGrank']['myDAGrank']]
             yData += [numberOfCell]
+            totalCells += numberOfCell
         plt.plot(xData,yData,'*')
         plt.grid(True)
         plt.xlabel('DAGRank')
         plt.ylabel('Number Of Cells')
         plt.title('number cells VS DAGRank')
+        plt.legend(['TotalCellsScheduled {0}'.format(totalCells)])
         
     def plotSynctimeVSNumberMotes(self):
         plt.figure(2)
         xData = []
         yData = []
         asn = []
+        syncedMotes = 0
         for moteid, data in self.figureData['figure_2_syncTime.txt'].items():
             if 'asn_0_1' in data:
                 asn += [data['asn_0_1']*0.015]
+                print moteid, str(data['asn_0_1'])
+                syncedMotes+=1
             else:
                 continue
         xData = sorted(asn)
@@ -81,6 +87,7 @@ class plotFigure():
         plt.xlabel('Time (Second)')
         plt.ylabel('Number Of Motes')
         plt.title('sync time')
+        plt.legend(['TotalSyncedMotes {0}'.format(syncedMotes)])
         
     def plotCellUsageVSNumberCells(self):
         plt.figure(3)
@@ -90,7 +97,7 @@ class plotFigure():
             for item in data:
                 xData += [item[0]]
                 yData += [item[1]]
-            plt.plot(xData,yData)
+            plt.plot(xData,yData,label=moteid)
         plt.grid(True)
         plt.xlabel('SlotFrame Number')
         plt.ylabel('Cell Usage (Number of transmission in last 10 Slotframes)')
@@ -102,7 +109,7 @@ class plotFigure():
         xData = [i for i in range(101)]
         yData = {}
         for moteid, data in self.figureData['figure_4_cellPDR.txt'].items():
-            plt.plot(xData,data,'*')
+            plt.plot(xData,data)
         plt.grid(True)
         plt.xlabel('SlotOffset')
         plt.ylabel('Cell Packet Delivery Ratio')
