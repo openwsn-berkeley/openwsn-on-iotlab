@@ -11,7 +11,7 @@ import StackDefines
 import pprint
 
 #============================ defines =========================================
-LOGFILE_PATH              = '52838/'
+LOGFILE_PATH              = '52936/'
 
 CELLTYPE_OFF              = 0
 CELLTYPE_TX               = 1
@@ -265,7 +265,11 @@ class LogfileParser(object):
     
     def parseHeader(self,bytes,formatString,fieldNames):
         returnVal = {}
-        fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
+        try:
+            fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
+        except:
+            with open(LOGFILE_PATH+'parserLog.txt') as f:
+                f.write("{0} {1} {2}".format(fieldNames, formatString, bytes))
         for (n,v) in zip(fieldNames,fieldVals):
             returnVal[n] = v
         return returnVal
