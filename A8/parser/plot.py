@@ -38,13 +38,13 @@ class plotFigure():
         plt.show()
                 
     def plotOneFigure(self,filename):
-        if filename == 'figure_1_schedule&rank.txt':
+        if filename == 'cells_vs_rank.txt':
             self.plotCellsVSRankData()
-        elif filename == 'figure_2_syncTime.txt':
+        elif filename == 'networkSyncTime.txt':
             self.plotSynctimeVSNumberMotes()
-        elif filename == 'figure_3_cellUsage.txt':
+        elif filename == 'cellUsage.txt':
             self.plotCellUsageVSNumberCells()
-        elif filename == 'figure_4_cellPDR.txt':
+        elif filename == 'cell_pdr.txt':
             self.plotCellPDR()
         
     def plotCellsVSRankData(self):
@@ -52,7 +52,7 @@ class plotFigure():
         xData = []
         yData = []
         totalCells = 0
-        for moteid, data in self.figureData['figure_1_schedule&rank.txt'].items():
+        for moteid, data in self.figureData['cells_vs_rank.txt'].items():
             numberOfCell = 0
             for i in range(23): # 23 cells buffer entries 
                 if data[i]['type'] == CELLTYPE_TX or data[i]['type'] == CELLTYPE_RX:
@@ -73,10 +73,9 @@ class plotFigure():
         yData = []
         asn = []
         syncedMotes = 0
-        for moteid, data in self.figureData['figure_2_syncTime.txt'].items():
+        for moteid, data in self.figureData['networkSyncTime.txt'].items():
             if 'asn_0_1' in data:
                 asn += [data['asn_0_1']*0.015]
-                print moteid, str(data['asn_0_1'])
                 syncedMotes+=1
             else:
                 continue
@@ -93,7 +92,7 @@ class plotFigure():
         plt.figure(3)
         xData = []
         yData = []
-        for moteid, data in self.figureData['figure_3_cellUsage.txt'].items():
+        for moteid, data in self.figureData['cellUsage.txt'].items():
             for item in data:
                 xData += [item[0]]
                 yData += [item[1]]
@@ -108,7 +107,7 @@ class plotFigure():
         plt.figure(4)
         xData = [i for i in range(101)]
         yData = {}
-        for moteid, data in self.figureData['figure_4_cellPDR.txt'].items():
+        for moteid, data in self.figureData['cell_pdr.txt'].items():
             plt.plot(xData,data)
         plt.grid(True)
         plt.xlabel('SlotOffset')

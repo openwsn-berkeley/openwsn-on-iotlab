@@ -11,7 +11,7 @@ import StackDefines
 import pprint
 
 #============================ defines =========================================
-LOGFILE_PATH              = '52936/'
+LOGFILE_PATH              = '53246/'
 
 CELLTYPE_OFF              = 0
 CELLTYPE_TX               = 1
@@ -52,25 +52,94 @@ class LogfileParser(object):
         self.cellPDR        = {}
         self.moteAddress    = {}
         # parse
-        self.parseAllFiles()
+        alldata = self.parseAllFiles()
+        
+        # analyze
+        allflatdata = []
+        for (k,v) in alldata.items():
+            allflatdata += v
+        
+        # how many errors?
+        errorcount = {}
+        for d in allflatdata:
+            if 'errcode' in d:
+                errstring = StackDefines.errorDescriptions[d['errcode']]
+                if errstring not in errorcount:
+                    errorcount[errstring] = 0
+                errorcount[errstring] += 1
+        with open('errors.txt','w') as f:
+            f.write(str(errorcount))
+            
+            
+        # schedule vs rank
+        for (moteid,data) in alldata.items():
+            self.scheduletable[moteid] = {}
+            for d in data:
+                if 'slotOffset' in d:
+                    self.scheduletable[moteid][d['row']] = d
+                if 'myDAGrank' in d:
+                    self.scheduletable[moteid]['myDAGrank']= d
+                
+        self.writeToFile('cells_vs_rank.txt',self.scheduletable)
+        
+        # network sync Time
+        for (moteid,data) in alldata.items():
+            self.syncTime[moteid] = {}
+            isSynced = False
+            for d in data:
+                if 'isSync' in d and d['isSync'] == 1:
+                    isSynced = True
+                if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
+                        self.syncTime[moteid] = d
+                        break 
+
+        self.writeToFile('networkSyncTime.txt',self.syncTime)
+                    
+        # usage of sixop reserved cells
+        for (moteid,data) in alldata.items():
+            self.cellUsage[moteid] = []
+            slotFrameCount         = 0
+            cellusagePerSlotFrame  = 0
+            for d in data:
+                if 'slotOffset' in d:
+                    if d['slotOffset'] == 0:
+                        self.cellUsage[moteid] += [(slotFrameCount,cellusagePerSlotFrame)]
+                        cellusagePerSlotFrame   = 0
+                        slotFrameCount         += 1
+                        break
+                    if d['type'] == CELLTYPE_TX:
+                        cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
+                        
+        self.writeToFile('cellUsage.txt',self.cellUsage)
+        
+        # PDR statistic of sixtop reserved cells
+        for (moteid,data) in alldata.items():
+            self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
+            for d in data:
+                if 'slotOffset' in d:
+                    if d['type'] == CELLTYPE_TX:
+                        if d['numTx'] != 0:
+                            self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
+        
+        self.writeToFile('cell_pdr.txt',self.cellPDR)
+        
+        # mote mapping
+        for (moteid,data) in alldata.items():
+            self.moteAddress[moteid] = {}
+            for d in data:
+                if 'my16bID' in d:
+                    self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
+        
+        self.writeToFile('moteId.txt',self.moteAddress)
     
-    # parse all files
     def parseAllFiles(self):
+        alldata = {}
         for filename in os.listdir(LOGFILE_PATH):
             if filename.endswith('.log'):
                 print 'Parsing {0}...'.format(filename),
-                parsedFrames = self.parseOneFile(LOGFILE_PATH+filename)
-                self.getFigure1Data(filename,parsedFrames)
-                self.getFigure2Data(filename,parsedFrames)
-                self.getFigure3Data(filename,parsedFrames)
-                self.getFigure4Data(filename,parsedFrames)
-                self.getMoteAddress(filename,parsedFrames)
+                alldata[filename] = self.parseOneFile(LOGFILE_PATH+filename)
                 print 'done.'
-        self.writeToFile('figure_1_schedule&rank.txt',self.scheduletable)
-        self.writeToFile('figure_2_syncTime.txt',self.syncTime)
-        self.writeToFile('figure_3_cellUsage.txt',self.cellUsage)
-        self.writeToFile('figure_4_cellPDR.txt',self.cellPDR)
-        self.writeToFile('moteAddressId_mapping.txt',self.moteAddress)
+        return alldata
 
     def parseOneFile(self,filename):
         self.hdlc  = OpenHdlc.OpenHdlc()
@@ -210,51 +279,6 @@ class LogfileParser(object):
         pass
     
     #======================== level 2 parsers =================================
-    
-    # get figure data
-    def getFigure1Data(self,moteid,oneFileData):
-        self.scheduletable[moteid] = {}
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                self.scheduletable[moteid][d['row']] = d
-            if 'myDAGrank' in d:
-                self.scheduletable[moteid]['myDAGrank']= d
-    def getFigure2Data(self,moteid,oneFileData):
-        self.syncTime[moteid] = {}
-        isSynced = False
-        for d in oneFileData:
-            if 'isSync' in d and d['isSync'] == 1:
-                isSynced = True
-            if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
-                    self.syncTime[moteid] = d
-                    break    
-    def getFigure3Data(self,moteid,oneFileData):
-        self.cellUsage[moteid] = []
-        slotFrameCount         = 0
-        cellusagePerSlotFrame  = 0
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['slotOffset'] == 0:
-                    self.cellUsage[moteid] += [(slotFrameCount,cellusagePerSlotFrame)]
-                    cellusagePerSlotFrame   = 0
-                    slotFrameCount         += 1
-                    break
-                if d['type'] == CELLTYPE_TX:
-                    cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
-
-    def getFigure4Data(self,moteid,oneFileData):
-        self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['type'] == CELLTYPE_TX:
-                    if d['numTx'] != 0:
-                        self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
-
-    def getMoteAddress(self,moteid,oneFileData):
-        self.moteAddress[moteid] = {}
-        for d in oneFileData:
-            if 'my16bID' in d:
-                self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
 
     def writeToFile(self,filename,data):
         with open(filename,'w') as f:
@@ -265,11 +289,7 @@ class LogfileParser(object):
     
     def parseHeader(self,bytes,formatString,fieldNames):
         returnVal = {}
-        try:
-            fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
-        except:
-            with open(LOGFILE_PATH+'parserLog.txt') as f:
-                f.write("{0} {1} {2}".format(fieldNames, formatString, bytes))
+        fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
         for (n,v) in zip(fieldNames,fieldVals):
             returnVal[n] = v
         return returnVal
