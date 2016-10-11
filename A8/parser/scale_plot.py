@@ -35,7 +35,7 @@ class plotFigure():
         for filename in os.listdir(FIGUREFILE_PATH):
             if filename.endswith('.txt'):
                 self.plotOneFigure(filename)
-        plt.show()
+        # plt.show()
                 
     def plotOneFigure(self,filename):
         if filename == 'cells_vs_rank.txt':
@@ -66,6 +66,7 @@ class plotFigure():
         plt.ylabel('Number Of Cells')
         plt.title('number cells VS DAGRank')
         plt.legend(['TotalCellsScheduled {0}'.format(totalCells)])
+        plt.savefig('figures/cell_vs_rank.png')
         
     def plotSynctimeVSNumberMotes(self):
         plt.figure(2)
@@ -87,6 +88,7 @@ class plotFigure():
         plt.ylabel('Number Of Motes')
         plt.title('sync time')
         plt.legend(['TotalSyncedMotes {0}'.format(syncedMotes)])
+        plt.savefig('figures/networkSyncTime.png')
         
     def plotCellUsageVSNumberCells(self):
         plt.figure(3)
@@ -102,6 +104,7 @@ class plotFigure():
         plt.ylabel('Cell Usage (Number of transmission in last 10 Slotframes)')
         plt.title('Cell usage per slotframe')
         plt.legend()
+        plt.savefig('figures/cellusage_vs_numbercells.png')
         
     def plotCellPDR(self):
         plt.figure(4)
@@ -113,6 +116,7 @@ class plotFigure():
         plt.xlabel('SlotOffset')
         plt.ylabel('Cell Packet Delivery Ratio')
         plt.title('Cell Packet Delivery Ratio')
+        plt.savefig('figures/cell_pdr.png')
         
 #============= public ===================
                 
@@ -121,7 +125,7 @@ class plotFigure():
 def main():
     try:
         plotFigure()
-        raw_input("Script ended normally. Press Enter to close.")
+        # raw_input("Script ended normally. Press Enter to close.")
     except Exception as err:
         print traceback.print_exc()
         raw_input("Script CRASHED. Press Enter to close.")
