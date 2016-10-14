@@ -1,14 +1,11 @@
 #!/usr/bin/python
 import struct
 import os
-import time
-from collections import namedtuple
 import sys
 sys.path.append(os.path.abspath('../experiment'))
 import OpenHdlc
 import traceback
 import StackDefines
-import pprint
 
 #============================ defines =========================================
 
@@ -51,96 +48,16 @@ class LogfileParser(object):
         self.moteAddress    = {}
         self.logfilePath    = logfilePath
         # parse
-        alldata = self.parseAllFiles()
-        
-        # analyze
-        allflatdata = []
-        for (k,v) in alldata.items():
-            allflatdata += v
-        
-        # how many errors?
-        errorcount = {}
-        for d in allflatdata:
-            if 'errcode' in d:
-                errstring = StackDefines.errorDescriptions[d['errcode']]
-                if errstring not in errorcount:
-                    errorcount[errstring] = 0
-                errorcount[errstring] += 1
-        with open('errors.txt','w') as f:
-            f.write(str(errorcount))
-            
-            
-        # schedule vs rank
-        for (moteid,data) in alldata.items():
-            self.scheduletable[moteid] = {}
-            for d in data:
-                if 'slotOffset' in d:
-                    self.scheduletable[moteid][d['row']] = d
-                if 'myDAGrank' in d:
-                    self.scheduletable[moteid]['myDAGrank']= d
-                
-        self.writeToFile('cells_vs_rank.txt',self.scheduletable)
-        
-        # network sync Time
-        for (moteid,data) in alldata.items():
-            self.syncTime[moteid] = {}
-            isSynced = False
-            for d in data:
-                if 'isSync' in d and d['isSync'] == 1:
-                    isSynced = True
-                if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
-                        self.syncTime[moteid] = d
-                        break 
-
-        self.writeToFile('networkSyncTime.txt',self.syncTime)
-                    
-        # usage of sixop reserved cells
-        for (moteid,data) in alldata.items():
-            self.cellUsage[moteid] = []
-            slotFrameCount         = 0
-            cellusagePerSlotFrame  = 0
-            for d in data:
-                if 'slotOffset' in d:
-                    if d['slotOffset'] == 0:
-                        self.cellUsage[moteid] += [(slotFrameCount,cellusagePerSlotFrame)]
-                        cellusagePerSlotFrame   = 0
-                        slotFrameCount         += 1
-                        break
-                    if d['type'] == CELLTYPE_TX:
-                        cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
-                        
-        self.writeToFile('cellUsage.txt',self.cellUsage)
-        
-        # PDR statistic of sixtop reserved cells
-        for (moteid,data) in alldata.items():
-            self.cellPDR[moteid] = [0 for i in range(SLOTFRAME_LENGTH)]
-            for d in data:
-                if 'slotOffset' in d:
-                    if d['type'] == CELLTYPE_TX:
-                        if d['numTx'] != 0:
-                            self.cellPDR[moteid][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
-        
-        self.writeToFile('cell_pdr.txt',self.cellPDR)
-        
-        # mote mapping
-        for (moteid,data) in alldata.items():
-            self.moteAddress[moteid] = {}
-            for d in data:
-                if 'my16bID' in d:
-                    self.moteAddress[moteid]['my16bID'] = hex(d['my16bID'])
-        
-        self.writeToFile('moteId.txt',self.moteAddress)
+        self.parseAllFiles()
     
     def parseAllFiles(self):
-        alldata = {}
         for filename in os.listdir(self.logfilePath):
             if filename.endswith('.log'):
                 print 'Parsing {0}...'.format(filename),
                 with open('parser.log','a') as f:
                     f.write("{0}\n".format(filename))
-                alldata[filename] = self.parseOneFile(self.logfilePath+filename)
+                self.parseOneFile(self.logfilePath+filename)
                 print 'done.'
-        return alldata
 
     def parseOneFile(self,filename):
         self.hdlc  = OpenHdlc.OpenHdlc()
@@ -280,13 +197,6 @@ class LogfileParser(object):
     def parse_REQUEST(self,frame):
         pass
     
-    #======================== level 2 parsers =================================
-
-    def writeToFile(self,filename,data):
-        with open(filename,'w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(data))
-    
     #======================== helpers =========================================
     
     def parseHeader(self,bytes,formatString,fieldNames):
@@ -313,13 +223,6 @@ def main():
 
 #============================ helper ==========================================
 
-def countOneInBinary(number):
-    count = 0
-    while (number>0):
-        count   = count+1;
-        number  = number & (number-1);
-        
-    return count
         
 if __name__ == "__main__":
     main()

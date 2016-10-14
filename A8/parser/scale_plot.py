@@ -16,6 +16,8 @@ CELLTYPE_TX               = 1
 CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
+MAXBUFFER_SCEHDULE        = 17 # 4 shared 3 serialRx 10 free buffer
+
 class plotFigure():
     def __init__(self):
         self.figureData = {}
@@ -54,7 +56,7 @@ class plotFigure():
         totalCells = 0
         for moteid, data in self.figureData['cells_vs_rank.txt'].items():
             numberOfCell = 0
-            for i in range(23): # 23 cells buffer entries 
+            for i in range(MAXBUFFER_SCEHDULE):
                 if data[i]['type'] == CELLTYPE_TX or data[i]['type'] == CELLTYPE_RX:
                     numberOfCell += 1
             xData += [data['myDAGrank']['myDAGrank']]
