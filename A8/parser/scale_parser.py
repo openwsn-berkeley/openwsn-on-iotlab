@@ -11,7 +11,6 @@ import StackDefines
 import pprint
 
 #============================ defines =========================================
-LOGFILE_PATH              = '53246/'
 
 CELLTYPE_OFF              = 0
 CELLTYPE_TX               = 1
@@ -19,7 +18,6 @@ CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
 SLOTFRAME_LENGTH          = 101
-
 
 #============================ class ===========================================
 class fieldParsingKey(object):
@@ -44,13 +42,14 @@ class LogfileParser(object):
     HDLC_ESCAPE            = '\x7d'
     HDLC_ESCAPE_ESCAPED    = '\x5d'
     
-    def __init__(self):
+    def __init__(self,logfilePath):
 
         self.scheduletable  = {}
         self.syncTime       = {}
         self.cellUsage      = {}
         self.cellPDR        = {}
         self.moteAddress    = {}
+        self.logfilePath    = logfilePath
         # parse
         alldata = self.parseAllFiles()
         
@@ -134,10 +133,10 @@ class LogfileParser(object):
     
     def parseAllFiles(self):
         alldata = {}
-        for filename in os.listdir(LOGFILE_PATH):
+        for filename in os.listdir(self.logfilePath):
             if filename.endswith('.log'):
                 print 'Parsing {0}...'.format(filename),
-                alldata[filename] = self.parseOneFile(LOGFILE_PATH+filename)
+                alldata[filename] = self.parseOneFile(self.logfilePath+filename)
                 print 'done.'
         return alldata
 
@@ -299,7 +298,7 @@ class LogfileParser(object):
 
 def main():
     try:
-        LogfileParser()
+        LogfileParser(LOGFILE_PATH)
         raw_input("Script ended normally. Press Enter to close.")
     except Exception as err:
         print traceback.print_exc()
