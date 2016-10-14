@@ -227,7 +227,7 @@ class LogfileParser(object):
         elif header['type']==9: # NeighborsRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BBBBBBBBBBBBBBBBBBBBBBHbBBBBBHHB',
+                '<BBBBBBBBBBBBBBBBBBBBBBHbBBBBBHHBB',
                 (
                     'row',                       # B
                     'used',                      # B
@@ -261,6 +261,7 @@ class LogfileParser(object):
                     'asn_2_3',                   # H
                     'asn_0_1',                   # H
                     'joinprio',                  # B
+                    'isNoRes',                   # B
                 ),
             )
         else:
