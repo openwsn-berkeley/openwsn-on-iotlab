@@ -136,6 +136,8 @@ class LogfileParser(object):
         for filename in os.listdir(self.logfilePath):
             if filename.endswith('.log'):
                 print 'Parsing {0}...'.format(filename),
+                with open('parser.log','a') as f:
+                    f.write("{0}\n".format(filename))
                 alldata[filename] = self.parseOneFile(self.logfilePath+filename)
                 print 'done.'
         return alldata
@@ -289,9 +291,14 @@ class LogfileParser(object):
     
     def parseHeader(self,bytes,formatString,fieldNames):
         returnVal = {}
-        fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
-        for (n,v) in zip(fieldNames,fieldVals):
-            returnVal[n] = v
+        try:
+            fieldVals = struct.unpack(formatString, ''.join([chr(b) for b in bytes]))
+            for (n,v) in zip(fieldNames,fieldVals):
+                returnVal[n] = v
+        except:
+            with open('parser.log','a') as f:
+                f.write(str([b for b in bytes]))
+            returnVal = {}
         return returnVal
 
 #============================ main ============================================
