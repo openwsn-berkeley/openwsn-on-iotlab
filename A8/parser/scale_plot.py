@@ -48,6 +48,8 @@ class plotFigure():
             self.plotCellUsageVSNumberCells()
         elif filename == 'cell_pdr.txt':
             self.plotCellPDR()
+        elif filename == 'isNoResNeigbor.txt':
+            self.plotMotesIsNoRes();
         
     def plotCellsVSRankData(self):
         plt.figure(1)
@@ -119,6 +121,29 @@ class plotFigure():
         plt.ylabel('Cell Packet Delivery Ratio')
         plt.title('Cell Packet Delivery Ratio')
         plt.savefig('figures/cell_pdr.png')
+        
+    def plotMotesIsNoRes(self):
+        fig5 = plt.figure(5)
+        isNoResData = {}
+        for moteid, data in self.figureData['isNoResNeigbor.txt'].items():
+            for row, nb_entry in data.items():
+                if nb_entry['used']==1:
+                    neighborId = hex(nb_entry['addr_128b_6']*255+nb_entry['addr_128b_7'])
+                    if neighborId in isNoResData and nb_entry['isNoRes'] == 1:
+                        isNoResData[neighborId] += 1
+                    else:
+                        if not (neighborId in isNoResData):
+                            isNoResData[neighborId] = 0
+        plt.plot(range(len(isNoResData)),isNoResData.values())
+        plt.grid(True)
+        plt.xticks(range(len(isNoResData)),list(isNoResData.keys()),rotation='vertical')
+        plt.xlabel('Mote ID')
+        plt.ylabel('Number times marked as \'isNoRes\'')
+        plt.title('Number times marked as \'isNoRes\'')
+        fig5.set_size_inches(30, 16)
+        plt.savefig('figures/neighbor_isNoRes.png')
+                        
+                
         
 #============= public ===================
                 

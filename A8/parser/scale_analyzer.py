@@ -26,6 +26,7 @@ class LogfileAnalyzer(object):
         self.cellUsage      = {}
         self.cellPDR        = {}
         self.moteAddress    = {}
+        self.neighbortable  = {}
         self.logfilePath    = logfilePath
         
         # analyze
@@ -38,6 +39,7 @@ class LogfileAnalyzer(object):
         self.writeToFile('networkSyncTime.txt',self.syncTime)        
         self.writeToFile('cellUsage.txt',self.cellUsage)
         self.writeToFile('cell_pdr.txt',self.cellPDR)
+        self.writeToFile('isNoResNeigbor.txt',self.neighbortable)
         self.writeToFile('moteId.txt',self.moteAddress)
     
     def analyzeAllFiles(self):
@@ -101,6 +103,12 @@ class LogfileAnalyzer(object):
                 if d['type'] == CELLTYPE_TX:
                     if d['numTx'] != 0:
                         self.cellPDR[filename][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
+                        
+        # ==== last neighbor table
+        self.neighbortable[filename] = {}
+        for d in oneFileData:
+            if 'isNoRes' in d:
+                self.neighbortable[filename][d['row']] = d
         
         # ==== mote mapping
         self.moteAddress[filename] = {}
