@@ -97,12 +97,12 @@ class LogfileAnalyzer(object):
                     cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
         
         # ==== PDR statistic of sixtop reserved cells
-        self.cellPDR[filename] = [0 for i in range(SLOTFRAME_LENGTH)]
+        self.cellPDR[filename] = {}
         for d in oneFileData:
             if 'slotOffset' in d:
                 if d['type'] == CELLTYPE_TX:
                     if d['numTx'] != 0:
-                        self.cellPDR[filename][d['slotOffset']] = float(d['numTxACK'])/float(d['numTx'])
+                        self.cellPDR[filename]['{0} {1}'.format(d['slotOffset'],d['channelOffset'])] = float(d['numTxACK'])/float(d['numTx'])
                         
         # ==== last neighbor table
         self.neighbortable[filename] = {}

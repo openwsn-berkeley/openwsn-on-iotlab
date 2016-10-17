@@ -111,19 +111,61 @@ class plotFigure():
         plt.savefig('figures/cellusage_vs_numbercells.png')
         
     def plotCellPDR(self):
-        plt.figure(4)
-        xData = [i for i in range(101)]
-        yData = {}
+        fig4,ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        avgPdrData      = {}
+        cellPresentTime = {}
+        PdrData = [[[] for i in range(16)] for j in range(101)]
         for moteid, data in self.figureData['cell_pdr.txt'].items():
-            plt.plot(xData,data)
+            for cell, pdr in data.items():
+                x = int(cell.split()[0])
+                y = int(cell.split()[1])
+                PdrData[x][y] += [float(pdr)]
+                
+                cell = '({0} {1})'.format(x,y)
+                if cell in avgPdrData:
+                    avgPdrData[cell] += [float(pdr)]
+                else:
+                    avgPdrData[cell] = [float(pdr)]
+                    
+                if cell in cellPresentTime:
+                    cellPresentTime[cell] += 1
+                else:
+                    cellPresentTime[cell] = 1
+                
+        for cell, pdrlist in avgPdrData.items():
+            avgPdrData[cell] = sum(pdrlist)/len(pdrlist)
+        line1, = ax1.plot(range(len(avgPdrData)),avgPdrData.values(),'b-',label='cell pdr')
+        line2, = ax2.plot(range(len(cellPresentTime)),cellPresentTime.values(),'r-',label='times cell being selected')
+        ax1.set_xticks(range(len(cellPresentTime)))
+        ax1.set_xticklabels(list(avgPdrData.keys()),rotation=90)
+        plt.xlim(0,len(avgPdrData))
+        plt.grid(True)
+        ax1.set_xlabel('cells (slotoffset channeloffset)')
+        ax1.set_ylabel('packet delivery ratio',color='b')
+        ax2.set_ylabel('cell being selected times',color='r')
+        ax1.set_ylim(-0.1,4)
+        ax2.set_ylim(-0.1,4)
+        plt.legend(handles=[line1,line2])
+        fig4.set_size_inches(150, 16.5)
+        plt.savefig('figures/cell_pdr.png')
+        plt.title('Cell Packet Delivery Ratio') 
+        
+        fig5= plt.figure(5)
+        numTimeReservedData = [[len(PdrData[j][i]) if len(PdrData[j][i])>1 else 0 for i in range(16)] for j in range(101)]
+        plt.pcolor(np.float_(np.transpose(numTimeReservedData)),cmap='Blues',label='number of times cell being reserved')
+        plt.colorbar()
         plt.grid(True)
         plt.xlabel('SlotOffset')
-        plt.ylabel('Cell Packet Delivery Ratio')
-        plt.title('Cell Packet Delivery Ratio')
-        plt.savefig('figures/cell_pdr.png')
+        plt.ylabel('Channeloffset')
+        plt.title('cells reserved overlapping')
+        plt.xlim(7,101)
+        plt.ylim(0,16)
+        fig5.set_size_inches(40.5, 10.5)
+        plt.savefig('figures/reserveOverlap.png')
         
     def plotMotesIsNoRes(self):
-        fig5 = plt.figure(5)
+        fig6 = plt.figure(6)
         isNoResData = {}
         for moteid, data in self.figureData['isNoResNeigbor.txt'].items():
             for row, nb_entry in data.items():
@@ -140,7 +182,7 @@ class plotFigure():
         plt.xlabel('Mote ID')
         plt.ylabel('Number times marked as \'isNoRes\'')
         plt.title('Number times marked as \'isNoRes\'')
-        fig5.set_size_inches(30, 16)
+        fig6.set_size_inches(18.5, 10.5)
         plt.savefig('figures/neighbor_isNoRes.png')
                         
                 
