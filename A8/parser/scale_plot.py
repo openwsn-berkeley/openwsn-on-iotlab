@@ -59,7 +59,7 @@ class plotFigure():
         for moteid, data in self.figureData['cells_vs_rank.txt'].items():
             numberOfCell = 0
             for i in range(MAXBUFFER_SCEHDULE):
-                if data[i]['type'] == CELLTYPE_TX or data[i]['type'] == CELLTYPE_RX:
+                if data[i]['type'] == CELLTYPE_TX :
                     numberOfCell += 1
             xData += [data['myDAGrank']['myDAGrank']]
             yData += [numberOfCell]
@@ -86,12 +86,12 @@ class plotFigure():
                 continue
         xData = sorted(asn)
         yData = [i+1 for i in range(len(asn))]
-        plt.plot(xData,yData,'*')
+        plt.plot(xData,yData,'-',label='TotalSyncedMotes {0}'.format(syncedMotes))
         plt.grid(True)
         plt.xlabel('Time (Second)')
         plt.ylabel('Number Of Motes')
         plt.title('sync time')
-        plt.legend(['TotalSyncedMotes {0}'.format(syncedMotes)])
+        plt.legend(loc=2)
         plt.savefig('figures/networkSyncTime.png')
         
     def plotCellUsageVSNumberCells(self):
