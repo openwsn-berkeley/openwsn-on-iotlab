@@ -17,6 +17,7 @@ CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
 MAXBUFFER_SCEHDULE        = 17 # 4 shared 3 serialRx 10 free buffer
+SLOTFRAME_LENGTH          = 503
 
 class plotFigure():
     def __init__(self):
@@ -115,7 +116,7 @@ class plotFigure():
         ax2 = ax1.twinx()
         avgPdrData      = {}
         cellPresentTime = {}
-        PdrData = [[[] for i in range(16)] for j in range(101)]
+        PdrData = [[[] for i in range(16)] for j in range(SLOTFRAME_LENGTH)]
         for moteid, data in self.figureData['cell_pdr.txt'].items():
             for cell, pdr in data.items():
                 x = int(cell.split()[0])
@@ -152,14 +153,14 @@ class plotFigure():
         plt.title('Cell Packet Delivery Ratio') 
         
         fig5= plt.figure(5)
-        numTimeReservedData = [[len(PdrData[j][i]) if len(PdrData[j][i])>1 else 0 for i in range(16)] for j in range(101)]
+        numTimeReservedData = [[len(PdrData[j][i]) if len(PdrData[j][i])>1 else 0 for i in range(16)] for j in range(SLOTFRAME_LENGTH)]
         plt.pcolor(np.float_(np.transpose(numTimeReservedData)),cmap='Blues',label='number of times cell being reserved')
         plt.colorbar()
         plt.grid(True)
         plt.xlabel('SlotOffset')
         plt.ylabel('Channeloffset')
         plt.title('cells reserved overlapping')
-        plt.xlim(7,101)
+        plt.xlim(7,SLOTFRAME_LENGTH)
         plt.ylim(0,16)
         fig5.set_size_inches(40.5, 10.5)
         plt.savefig('figures/reserveOverlap.png')
