@@ -86,15 +86,20 @@ class LogfileAnalyzer(object):
         self.cellUsage[filename] = []
         slotFrameCount         = 0
         cellusagePerSlotFrame  = 0
+        cellPerSlotframe       = 0
         for d in oneFileData:
             if 'slotOffset' in d:
-                if d['slotOffset'] == 0:
-                    self.cellUsage[filename] += [(slotFrameCount,cellusagePerSlotFrame)]
+                if d['type'] == CELLTYPE_OFF:
+                    continue
+                if d['slotOffset'] == 0 and d['type'] == CELLTYPE_TXRX:
+                    self.cellUsage[filename] += [(slotFrameCount,cellusagePerSlotFrame,cellPerSlotframe)]
                     cellusagePerSlotFrame   = 0
+                    cellPerSlotframe        = 0
                     slotFrameCount         += 1
-                    break
+                    continue
                 if d['type'] == CELLTYPE_TX:
                     cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
+                    cellPerSlotframe      += 1
         
         # ==== PDR statistic of sixtop reserved cells
         self.cellPDR[filename] = {}

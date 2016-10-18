@@ -65,6 +65,8 @@ class LogfileParser(object):
         
         parsedFrames = []
         for f in hdlcFrames:
+            if not f:
+                continue
             # first byte is the type of frame
             if   f[0]==ord('D'):
                 pf = self.parse_DATA(f[1:])

@@ -96,20 +96,31 @@ class plotFigure():
         plt.savefig('figures/networkSyncTime.png')
         
     def plotCellUsageVSNumberCells(self):
-        plt.figure(3)
-        xData = []
-        yData = []
+        numFigures = 0
         for moteid, data in self.figureData['cellUsage.txt'].items():
+            plt.figure(10+numFigures)
+            numFigures += 1
+            xData  = []
+            y1Data = []
+            y2Data = []
+            y3Data = []
             for item in data:
-                xData += [item[0]]
-                yData += [item[1]]
-            plt.plot(xData,yData,label=moteid)
-        plt.grid(True)
-        plt.xlabel('SlotFrame Number')
-        plt.ylabel('Cell Usage (Number of transmission in last 10 Slotframes)')
-        plt.title('Cell usage per slotframe')
-        plt.legend()
-        plt.savefig('figures/cellusage_vs_numbercells.png')
+                xData  += [item[0]]
+                y1Data += [item[1]]
+                y2Data += [item[2]]
+                if item[2]> 0:
+                    y3Data += [float(item[1])/float(item[2])]
+                else:
+                    y3Data += [0]
+            plt.plot(xData,y1Data,label='cell usage per slotframe')
+            plt.plot(xData,y2Data,label='number of cell per slotframe')
+            plt.plot(xData,y3Data,label='average cell usage per slotframe')
+            plt.grid(True)
+            plt.xlabel('SlotFrame Number')
+            plt.ylabel('Cell Usage (Number of transmission in 10 Slotframes)')
+            plt.title('Cell usage per slotframe on {0}'.format(moteid.split('.')[0][11:]))
+            plt.legend()
+            plt.savefig('figures/cellusage_vs_numbercells/cellusage_vs_numbercells_{0}.png'.format(moteid.split('.')[0][11:]))
         
     def plotCellPDR(self):
         fig4,ax1 = plt.subplots()
