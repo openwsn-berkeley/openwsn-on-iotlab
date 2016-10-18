@@ -5,6 +5,8 @@ import string
 import scipy as sp
 import scipy.stats
 
+from scipy.optimize import curve_fit
+
 import os
 import traceback
 
@@ -16,12 +18,16 @@ CELLTYPE_TX               = 1
 CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
-MAXBUFFER_SCEHDULE        = 17 # 4 shared 3 serialRx 10 free buffer
-SLOTFRAME_LENGTH          = 503
+MAXBUFFER_SCEHDULE        = 23 # 4 shared 3 serialRx 10 free buffer
+SLOTFRAME_LENGTH          = 307
+
+def func(x, a, b, c):
+    return a * np.exp(-b * x) + c
 
 class plotFigure():
-    def __init__(self):
+    def __init__(self,logfilePath):
         self.figureData = {}
+        self.logfilePath = logfilePath
         self.getFigureData()
         self.plotFigures()
         
@@ -60,18 +66,26 @@ class plotFigure():
         for moteid, data in self.figureData['cells_vs_rank.txt'].items():
             numberOfCell = 0
             for i in range(MAXBUFFER_SCEHDULE):
+                if not(i in data):
+                    continue
                 if data[i]['type'] == CELLTYPE_TX :
                     numberOfCell += 1
+            if data['myDAGrank']['myDAGrank'] == 65535: 
+                continue
             xData += [data['myDAGrank']['myDAGrank']]
             yData += [numberOfCell]
             totalCells += numberOfCell
-        plt.plot(xData,yData,'*')
+        popt, pcov = curve_fit(func, xData, yData, p0=(1, 1e-6, 1))
+        plt.plot(xData,yData,'o',label='Schedule cells')
+        x_fit = np.linspace(0,65535,100000)
+        print popt
+        plt.plot(x_fit, func(x_fit, *popt), 'r-', label="Fitted Curve")
         plt.grid(True)
         plt.xlabel('DAGRank')
         plt.ylabel('Number Of Cells')
-        plt.title('number cells VS DAGRank')
-        plt.legend(['TotalCellsScheduled {0}'.format(totalCells)])
-        plt.savefig('figures/cell_vs_rank.png')
+        plt.title('number cells VS DAGRank {0}'.format('TotalCellsScheduled {0}'.format(totalCells)))
+        plt.legend()
+        plt.savefig('{0}figures/cell_vs_rank.png'.format(self.logfilePath))
         
     def plotSynctimeVSNumberMotes(self):
         plt.figure(2)
@@ -93,7 +107,7 @@ class plotFigure():
         plt.ylabel('Number Of Motes')
         plt.title('sync time')
         plt.legend(loc=2)
-        plt.savefig('figures/networkSyncTime.png')
+        plt.savefig('{0}figures/networkSyncTime.png'.format(self.logfilePath))
         
     def plotCellUsageVSNumberCells(self):
         numFigures = 0
@@ -120,7 +134,7 @@ class plotFigure():
             plt.ylabel('Cell Usage (Number of transmission in 10 Slotframes)')
             plt.title('Cell usage per slotframe on {0}'.format(moteid.split('.')[0][11:]))
             plt.legend()
-            plt.savefig('figures/cellusage_vs_numbercells/cellusage_vs_numbercells_{0}.png'.format(moteid.split('.')[0][11:]))
+            plt.savefig('{0}figures/cellusage_vs_numbercells/cellusage_vs_numbercells_{1}.png'.format(self.logfilePath,moteid.split('.')[0][11:]))
         
     def plotCellPDR(self):
         fig4,ax1 = plt.subplots()
@@ -161,7 +175,7 @@ class plotFigure():
         plt.legend(handles=[line1,line2])
         fig4.set_size_inches(150, 16.5)
         plt.title('Cell Packet Delivery Ratio. (Totally {0} cells have being reserved)'.format(len(avgPdrData)))
-        plt.savefig('figures/cell_pdr.png') 
+        plt.savefig('{0}figures/cell_pdr.png'.format(self.logfilePath)) 
         
         fig5= plt.figure(5)
         numTimeReservedData = [[len(PdrData[j][i]) if len(PdrData[j][i])>1 else 0 for i in range(16)] for j in range(SLOTFRAME_LENGTH)]
@@ -174,7 +188,7 @@ class plotFigure():
         plt.xlim(7,SLOTFRAME_LENGTH)
         plt.ylim(0,16)
         fig5.set_size_inches(40.5, 10.5)
-        plt.savefig('figures/reserveOverlap.png')
+        plt.savefig('{0}figures/reserveOverlap.png'.format(self.logfilePath))
         
     def plotMotesIsNoRes(self):
         fig6 = plt.figure(6)
@@ -195,7 +209,7 @@ class plotFigure():
         plt.ylabel('Number times marked as \'isNoRes\'')
         plt.title('Number times marked as \'isNoRes\'')
         fig6.set_size_inches(18.5, 10.5)
-        plt.savefig('figures/neighbor_isNoRes.png')
+        plt.savefig('{0}figures/neighbor_isNoRes.png'.format(self.logfilePath))
                         
                 
         

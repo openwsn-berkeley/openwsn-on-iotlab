@@ -35,12 +35,12 @@ class LogfileAnalyzer(object):
         # write result to files
         with open('errors.txt','w') as f:
             f.write(str(self.errorcount))
-        self.writeToFile('cells_vs_rank.txt',self.scheduletable)
-        self.writeToFile('networkSyncTime.txt',self.syncTime)        
-        self.writeToFile('cellUsage.txt',self.cellUsage)
-        self.writeToFile('cell_pdr.txt',self.cellPDR)
-        self.writeToFile('isNoResNeigbor.txt',self.neighbortable)
-        self.writeToFile('moteId.txt',self.moteAddress)
+        self.writeToFile('{0}cells_vs_rank.txt'.format(self.logfilePath),self.scheduletable)
+        self.writeToFile('{0}networkSyncTime.txt'.format(self.logfilePath),self.syncTime)        
+        self.writeToFile('{0}cellUsage.txt'.format(self.logfilePath),self.cellUsage)
+        self.writeToFile('{0}cell_pdr.txt'.format(self.logfilePath),self.cellPDR)
+        self.writeToFile('{0}isNoResNeigbor.txt'.format(self.logfilePath),self.neighbortable)
+        self.writeToFile('{0}moteId.txt'.format(self.logfilePath),self.moteAddress)
     
     def analyzeAllFiles(self):
         for filename in os.listdir(self.logfilePath):
