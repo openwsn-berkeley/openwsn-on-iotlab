@@ -149,8 +149,8 @@ class plotFigure():
         ax2.set_ylim(-0.1,4)
         plt.legend(handles=[line1,line2])
         fig4.set_size_inches(150, 16.5)
-        plt.savefig('figures/cell_pdr.png')
-        plt.title('Cell Packet Delivery Ratio') 
+        plt.title('Cell Packet Delivery Ratio. (Totally {0} cells have being reserved)'.format(len(avgPdrData)))
+        plt.savefig('figures/cell_pdr.png') 
         
         fig5= plt.figure(5)
         numTimeReservedData = [[len(PdrData[j][i]) if len(PdrData[j][i])>1 else 0 for i in range(16)] for j in range(SLOTFRAME_LENGTH)]

@@ -53,7 +53,7 @@ Randomize the using shared slots. (light the traffic-contention on first several
 ### Result
 
 Only 17 Tx Cells are reserved after 90 minutes.
-543 cells are selected during 90 minutes running.
+543 cells have being selected during 90 minutes running.
 
 ### Possible reason
 The reserved cells through the network has a higher ratio of overlapping (same cell are selected by lots of motes).
@@ -74,3 +74,30 @@ Check the topology: https://www.iot-lab.info/testbed/maps.php?site=saclay
 
 Increase the slotframe length to 503. 
 
+## Experiment 53807
+
+### Modification
+
+Slotframe changed to 503.
+Number of shared cells changed to 10.
+Available free schedule entries increased to 20.
+Sixtop TIMEOUT updated accordingly.
+
+### Result
+
+23 Tx cells are reserved after 60 minutes
+315 cells have being selected during 60 minutes.
+Take more time to get whole network to synchronize (over 100 seconds to get more than 90 nodes synchronized.)
+
+### Possible reason
+
+The long slotframe length makes the EB sending on the slot 0 more frequently, making the collision worse. 
+The PDR of cells increased a little bit but still lots of cells have low PDR.
+
+Probably mote select the neighbor with low rank but lower rssi also at beginning.
+Increase the stability of neighbor threshold. 
+Use 101 slotframe.
+
+ 
+ 
+ 
