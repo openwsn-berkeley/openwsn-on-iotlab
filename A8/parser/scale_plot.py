@@ -37,7 +37,7 @@ class plotFigure():
         for filename in os.listdir(self.logfilePath+FIGUREFILE_PATH):
             if filename.endswith('.txt'):
                 print 'Getting data {0}...'.format(filename)
-                with open(filename,'r') as f:
+                with open(self.logfilePath+FIGUREFILE_PATH+filename,'r') as f:
                     s = f.read()
                     self.figureData[filename] = ast.literal_eval(s)
                 print 'Done.'
