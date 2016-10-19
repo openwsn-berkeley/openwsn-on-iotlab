@@ -12,14 +12,14 @@ import traceback
 
 import ast
 
-FIGUREFILE_PATH           = './'
+FIGUREFILE_PATH           = 'analyzeResult/'
 CELLTYPE_OFF              = 0
 CELLTYPE_TX               = 1
 CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
 MAXBUFFER_SCEHDULE        = 23 # 4 shared 3 serialRx 10 free buffer
-SLOTFRAME_LENGTH          = 307
+SLOTFRAME_LENGTH          = 101
 
 def func(x, a, b, c):
     return a * np.exp(-b * x) + c
@@ -28,11 +28,13 @@ class plotFigure():
     def __init__(self,logfilePath):
         self.figureData = {}
         self.logfilePath = logfilePath
+        if not (os.path.exists(os.path.dirname(self.logfilePath+'figures/cellusage_vs_numbercells/'))):
+            os.makedirs(os.path.dirname(self.logfilePath+'figures/cellusage_vs_numbercells/'))
         self.getFigureData()
         self.plotFigures()
         
     def getFigureData(self):
-        for filename in os.listdir(FIGUREFILE_PATH):
+        for filename in os.listdir(self.logfilePath+FIGUREFILE_PATH):
             if filename.endswith('.txt'):
                 print 'Getting data {0}...'.format(filename)
                 with open(filename,'r') as f:
@@ -41,7 +43,7 @@ class plotFigure():
                 print 'Done.'
                 
     def plotFigures(self):
-        for filename in os.listdir(FIGUREFILE_PATH):
+        for filename in os.listdir(self.logfilePath+FIGUREFILE_PATH):
             if filename.endswith('.txt'):
                 self.plotOneFigure(filename)
         # plt.show()

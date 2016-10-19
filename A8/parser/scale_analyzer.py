@@ -33,14 +33,16 @@ class LogfileAnalyzer(object):
         self.analyzeAllFiles()
         
         # write result to files
-        with open('errors.txt','w') as f:
+        if not (os.path.exists(os.path.dirname(self.logfilePath+'analyzeResult/'))):
+            os.makedirs(os.path.dirname(self.logfilePath+'analyzeResult/'))
+        with open('{0}analyzeResult/errors.txt'.format(self.logfilePath),'w') as f:
             f.write(str(self.errorcount))
-        self.writeToFile('{0}cells_vs_rank.txt'.format(self.logfilePath),self.scheduletable)
-        self.writeToFile('{0}networkSyncTime.txt'.format(self.logfilePath),self.syncTime)        
-        self.writeToFile('{0}cellUsage.txt'.format(self.logfilePath),self.cellUsage)
-        self.writeToFile('{0}cell_pdr.txt'.format(self.logfilePath),self.cellPDR)
-        self.writeToFile('{0}isNoResNeigbor.txt'.format(self.logfilePath),self.neighbortable)
-        self.writeToFile('{0}moteId.txt'.format(self.logfilePath),self.moteAddress)
+        self.writeToFile('{0}analyzeResult/cells_vs_rank.txt'.format(self.logfilePath),self.scheduletable)
+        self.writeToFile('{0}analyzeResult/networkSyncTime.txt'.format(self.logfilePath),self.syncTime)        
+        self.writeToFile('{0}analyzeResult/cellUsage.txt'.format(self.logfilePath),self.cellUsage)
+        self.writeToFile('{0}analyzeResult/cell_pdr.txt'.format(self.logfilePath),self.cellPDR)
+        self.writeToFile('{0}analyzeResult/isNoResNeigbor.txt'.format(self.logfilePath),self.neighbortable)
+        self.writeToFile('{0}analyzeResult/moteId.txt'.format(self.logfilePath),self.moteAddress)
     
     def analyzeAllFiles(self):
         for filename in os.listdir(self.logfilePath):
