@@ -92,12 +92,112 @@ Take more time to get whole network to synchronize (over 100 seconds to get more
 ### Possible reason
 
 The long slotframe length makes the EB sending on the slot 0 more frequently, making the collision worse. 
-The PDR of cells increased a little bit but still lots of cells have low PDR.
+The PDR of cells increased a little bit but still lots of cells have low PDR(<50%).
 
-Probably mote select the neighbor with low rank but lower rssi also at beginning.
+Probably mote select the neighbor with low rank but lower RSSI also at beginning.
 Increase the stability of neighbor threshold. 
-Use 101 slotframe.
 
- 
+## Experiment 53811
+
+### Modification
+
+randomize EB sending period from {15 ~ 45} seconds. 
+Increase the stability of neighbor threshold:
+
+- BADNEIGHBORMAXRSSI        -60dBm
+- GOODNEIGHBORMINRSSI       -70dBm
+
+### Configuration
+
+- 503 slotframe
+- 10 shared slots:
+	- Slot 1 and 2  have 20%   possibility to be used if there is unicast packet to be sent.
+	- Slot 3 and 4  have 25%   possibility to be used if there is unicast packet to be sent.
+	- Slot 5 and 6  have 33.3% possibility to be used if there is unicast packet to be sent.
+	- slot 7 and 8  have 50%   possibility to be used if there is unicast packet to be sent.
+	- slot 9 and 10 have 100%  possibility to be used if there is unicast packet to be sent.
+
+## Result
+
+All motes synchronized with 2 minutes. (With 101 slotframe and sending EB averagely 10 seconds, 90% motes synchronized within 1 minute).
+The PDR of lots cells still stay low PDR (<50%).
+
+## Experiment 53856
+
+### Modification
+
+Increase shared slots to 10.
+Re-write the 
+> Randomize the using shared slots. (light the traffic-contention on first several slots)
+
+- Slot 1 and 2  have 66.6% possibility to be used if there is uni-cast packet to be sent.
+- Slot 3 and 4  have 75%   possibility to be used if there is uni-cast packet to be sent.
+- Slot 5 and 6  have 80%   possibility to be used if there is uni-cast packet to be sent.
+- slot 7 and 8  have 83.3% possibility to be used if there is uni-cast packet to be sent.
+- slot 9 and 10 have 100%  possibility to be used if there is uni-cast packet to be sent.
+
+Chang back the stability of neighbor threshold:
+
+- BADNEIGHBORMAXRSSI        -70dBm
+- GOODNEIGHBORMINRSSI       -80dBm
+
+Only choose the parent with RSSI greater than -90dbm.
+
+## Result 
+
+With 101 slotframe and sending EB averagely 10 seconds, 90% motes synchronized within 1 minute.
+The PDR of lots cells still stay low PDR (<50%).
+Lots of cells are chosen by several motes at same time. Increase the Slot Frame length may light this situation.
+
+
+## Experiment 53865
+
+### Modification
+change to 307 slot frame
+
+## Result
+
+Less chance to be selected by two motes at same time. However, the PDR of lots cells still stay low PDR (<50%).
+Only 8 Sixtop return messages are recorded through the whole network.
+
+## Experiment 53868
+
+### Modification
+
+change to 101 slot frame
+Only choose the parent with RSSI greater than -80 dbm.
+
+Disable the 
+> Randomize the using shared slots. (light the traffic-contention on first several slots)
+
+## Result
+
+The PDR of lots cells still stay low PDR (<50%).
+
+Sixtop:
+
+- Receive Sixtop response at senddone status. This is caused by the response side, it takes long time to send sixtop response back (because of backoff, retries and waiting time when multiple sixtop response to send in buffer).  
+- Clear request happened 253 times with RC_SUCCESS, this means the parent changed frequently, and the cells to non-parent will be removed during the schedule housekeeping.  
+- Add request happened 1176 times with RC_SUCCESS.
+- Add request happened 27 times with RC_NORES.
+- Delete request happened 133 times with RC_SUCCESS. 
+
+## Experiment TBD
+
+### Actions/Ideas
+
+- Don't remove Rx cell one side in schedule housekeeping. Maybe because the PDR on that cells is low, there may be collisions on that cell. Let SF handle this.
+- Don't do sixtop relocation in housekeeping. Integrate it into SF function.
+	- Do the relocation when no needs to add or delete cells.
+	- Relocate cells with PDR<50%.
+	- By default, all cells have usage of cell (ThresholdAdd+ThresholdDelete)/2
+
+- The numTx and numTxAck in neighbor table should only used for Tx cells, not depending on all uni-cast packet. Since They are sent on shared slots also, which can't tell the really quality of the link. It's wrong to be used in this way when calculting the neighbor rank.
+- In neighbor housekeeping, parent shouldn't be removed because of no activity heard recently. Parent doesn't send packet to children, the EB/DIO can't be used to update the activity of parent/mote, especially in a density network.
+
+
+
+
+
  
  
