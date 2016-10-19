@@ -58,10 +58,12 @@ class LogfileAnalyzer(object):
                 oneFileData += [ast.literal_eval(line)]
             
         # ==== how many errors?
-        self.errorcount = {}
         for d in oneFileData:
             if 'errcode' in d:
                 errstring = StackDefines.errorDescriptions[d['errcode']]
+                if d['errcode'] == 60:
+                    rc,sm = StackDefines.sixtop_returncode[d['arg1']],StackDefines.sixtop_statemachine[d['arg2']]
+                    errstring = errstring.format(rc,sm)
                 if errstring not in self.errorcount:
                     self.errorcount[errstring] = 0
                 self.errorcount[errstring] += 1
