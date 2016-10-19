@@ -1,6 +1,6 @@
 # DO NOT EDIT DIRECTLY!
 # This file was generated automatically by GenStackDefines.py
-# on Thu, 13 Oct 2016 16:59:38
+# on Wed, 19 Oct 2016 15:56:53
 #
 
 components = {
@@ -51,7 +51,7 @@ errorDescriptions = {
    2: "received an echo reply",
    3: "getData asks for too few bytes, maxNumBytes={0}, fill level={1}",
    4: "the input buffer has overflown",
-   5: "the command is not allowerd, command = {0}",
+   5: "the command is not allowed, command = {0}",
    6: "unknown transport protocol {0} (code location {1})",
    7: "wrong TCP state {0} (code location {1})",
    8: "TCP reset while in state {0} (code location {1})",
@@ -137,4 +137,5 @@ sixtop_statemachine = {
   10: "WAIT_LISTRESPONSE",
   11: "WAIT_CLEARRESPONSE",
   12: "REQUEST_RECEIVED",
+  13: "WAIT_RESPONSE_SENDDONE",
 }
