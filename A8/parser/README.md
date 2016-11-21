@@ -184,6 +184,13 @@ Sixtop:
 
 ## Experiment TBD
 
+### Modification
+
+- Don't remove the parent if there is no activity heard from it.
+- Correct the TIMEOUT of sixtop
+- Only allow one sixtop transaction at one time. (To support multiple transaction, it required to maintain multiple state machine for each sixtop transaction.)
+
+
 ### Actions/Ideas
 
 - Don't remove Rx cell one side in schedule housekeeping. Maybe because the PDR on that cells is low, there may be collisions on that cell. Let SF handle this.
