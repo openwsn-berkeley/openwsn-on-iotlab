@@ -203,7 +203,24 @@ Sixtop:
 - In neighbor housekeeping, parent shouldn't be removed because of no activity heard recently. Parent doesn't send packet to children, the EB/DIO can't be used to update the activity of parent/mote, especially in a density network.
 
 
+## Experiment 55586
 
+### Previous review
+
+With the iot-lab_M3 driver located in openwsn-berkeley/openwsn-fw repository, part of the iot-lab_(A8-)M3 nodes stops sending serial data even at the status of joining. Reserve mote than 90 nodes on Saclay site, more than 10 nodes will stop sending serial data during 20 minutes experiment deployment.
+
+### Modification
+
+Replace iot-lab_M3 nodes driver by openmotestm. 
+https://github.com/openwsn-berkeley/openwsn-fw/commit/156f02a597176e799e396ebdf0300174d6dfc368
+
+
+The implementation is for A8 nodes. The only different between M3 and A8 M3 is that they uses different spi port. M3 (SPI1) A8_M3 (SPI2)
+
+### Result
+
+- All nodes send serial data within 30 minutes experiment deployment.
+- TBC.
 
 
  
