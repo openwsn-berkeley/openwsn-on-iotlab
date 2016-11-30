@@ -77,11 +77,11 @@ class plotFigure():
             xData += [data['myDAGrank']['myDAGrank']]
             yData += [numberOfCell]
             totalCells += numberOfCell
-        popt, pcov = curve_fit(func, xData, yData, p0=(1, 1e-6, 1))
+        # popt, pcov = curve_fit(func, xData, yData, p0=(1, 1e-6, 1))
         plt.plot(xData,yData,'o',label='Schedule cells')
-        x_fit = np.linspace(0,65535,100000)
-        print popt
-        plt.plot(x_fit, func(x_fit, *popt), 'r-', label="Fitted Curve")
+        # x_fit = np.linspace(0,65535,100000)
+        # print popt
+        # plt.plot(x_fit, func(x_fit, *popt), 'r-', label="Fitted Curve")
         plt.grid(True)
         plt.xlabel('DAGRank')
         plt.ylabel('Number Of Cells')
@@ -142,6 +142,7 @@ class plotFigure():
         fig4,ax1 = plt.subplots()
         ax2 = ax1.twinx()
         avgPdrData      = {}
+        moteidList      = {}
         cellPresentTime = {}
         PdrData = [[[] for i in range(16)] for j in range(SLOTFRAME_LENGTH)]
         for moteid, data in self.figureData['cell_pdr.txt'].items():
@@ -156,6 +157,11 @@ class plotFigure():
                 else:
                     avgPdrData[cell] = [float(pdr)]
                     
+                if cell in moteidList:
+                    moteidList[cell] += [moteid[14:17]]
+                else:
+                    moteidList[cell] = [moteid[14:17]]
+                    
                 if cell in cellPresentTime:
                     cellPresentTime[cell] += 1
                 else:
@@ -166,7 +172,8 @@ class plotFigure():
         line1, = ax1.plot(range(len(avgPdrData)),avgPdrData.values(),'b-',label='cell pdr')
         line2, = ax2.plot(range(len(cellPresentTime)),cellPresentTime.values(),'r-',label='times cell being selected')
         ax1.set_xticks(range(len(cellPresentTime)))
-        ax1.set_xticklabels(list(avgPdrData.keys()),rotation=90)
+        xl = ["{0} {1}".format(avgPdrData.keys()[i],moteidList[avgPdrData.keys()[i]]) for i in range(len(avgPdrData.keys()))]
+        ax1.set_xticklabels(list(xl),rotation=90)
         plt.xlim(0,len(avgPdrData))
         plt.grid(True)
         ax1.set_xlabel('cells (slotoffset channeloffset)')
