@@ -111,6 +111,15 @@ class LogfileParser(object):
             )
         elif header['type']==2: # MyDagRank
             payload = self.parseHeader(frame[3:],'<H',('myDAGrank',))
+        elif header['type']==3: # OutputBuffer
+            payload = self.parseHeader   (
+                frame[3:],
+                '<HH',
+                (
+                    'index_write',               # H
+                    'index_read',                # H
+                ),
+            )
         elif header['type']==4: # Asn
             payload = self.parseHeader(
                 frame[3:],
@@ -119,6 +128,20 @@ class LogfileParser(object):
                     'asn_4',                     # B
                     'asn_2_3',                   # H
                     'asn_0_1',                   # H
+                ),
+            )
+        elif header['type']==5: # Macstates
+            payload = self.parseHeader(
+                frame[3:],
+                '<BBhhBII',
+                (
+                    'numSyncPkt' ,               # B
+                    'numSyncAck',                # B
+                    'minCorrection',             # h
+                    'maxCorrection',             # h
+                    'numDeSync',                 # B
+                    'numTicsOn',                 # I
+                    'numTicsTotal',              # I
                 ),
             )
         elif header['type']==6: # ScheduleRow
@@ -142,6 +165,42 @@ class LogfileParser(object):
                     'lastUsedAsn_0_1',           # H
                     'usageBitMap',               # H
                     'bitMapIndex',               # B
+                ),
+            )
+        elif header['type']==7: # Backoff
+            payload = self.parseHeader   (
+                frame[3:],
+                '<BB',
+                (
+                    'backoffExponent',           # B
+                    'backoff',                   # B
+                ),
+            )
+        elif header['type']==8: # QueueRow
+            payload = self.parseHeader(
+                frame[3:],
+                '<BBBBBBBBBBBBBBBBBBBB',
+                (
+                    'creator_0',                 # B
+                    'owner_0',                   # B
+                    'creator_1',                 # B
+                    'owner_1',                   # B
+                    'creator_2',                 # B
+                    'owner_2',                   # B
+                    'creator_3',                 # B
+                    'owner_3',                   # B
+                    'creator_4',                 # B
+                    'owner_4',                   # B
+                    'creator_5',                 # B
+                    'owner_5',                   # B
+                    'creator_6',                 # B
+                    'owner_6',                   # B
+                    'creator_7',                 # B
+                    'owner_7',                   # B
+                    'creator_8',                 # B
+                    'owner_8',                   # B
+                    'creator_9',                 # B
+                    'owner_9',                   # B
                 ),
             )
         elif header['type']==9: # NeighborsRow
