@@ -244,16 +244,25 @@ No Modification. Just start node-a8-2 as dagroot.
 - Some cells' PDR are still low. 
 
 
+---
+## To Be filled
 
+...
 
+...
 
+...
+
+...
+
+---
 
 
 ## Experiment 56333
 
 ### Modification 
 
-- increase Tx power to -7dbm, 
+- increase Tx power to -3dbm, 
 - RSSI threshold for stable neighbor is set to (-60)-(-70)
 - if the neighbor rssi is lower than -60, don't record this neighbor
 
@@ -273,3 +282,34 @@ No Modification. Just start node-a8-2 as dagroot.
 - Always reserve some buffer for 6top transaction.
  
  
+## Experiment 56337
+
+### Modification
+
+- Make KA send after 5 second not heard anything. Desync to 15 seconds
+- first 4 cells in the queue are reserved for packet creator with id lower than sixtop_res
+
+### result
+
+all PDR is high (around 100%)
+
+## Experiement 56338
+
+### Modification
+
+No modification but with 100 nodes.
+
+## result
+
+- able to see >60 nodes in the routing page
+- Some cell's PDR is still low
+- Node 3->node2,  slotoffset 18 Tx is reserved on node 3 side, but Rx never on node 2 side. (TB investigated)
+- error message: 'the slot {0} to be added is already in schedule': 2,
+
+
+## Analysis
+
+- tip1: increase the Ka period to support more hop network
+- tip2: modify the rssi threshold value to get a less hop network
+- find the reason why Rx part is not reserved
+- tip3: print out something related to the timeCorrection
