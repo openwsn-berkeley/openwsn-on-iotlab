@@ -207,7 +207,7 @@ Sixtop:
 
 ### Previous review
 
-With the iot-lab_M3 driver located in openwsn-berkeley/openwsn-fw repository, part of the iot-lab_(A8-)M3 nodes stops sending serial data even at the status of joining. Reserve mote than 90 nodes on Saclay site, more than 10 nodes will stop sending serial data during 20 minutes experiment deployment.
+With the IoT-lab M3 driver located in openwsn-berkeley/openwsn-fw repository, part of the iot-lab_(A8-)M3 nodes stops sending serial data even at the status of joining. Reserve mote than 90 nodes on Saclay site, more than 10 nodes will stop sending serial data during 20 minutes experiment deployment.
 
 ### Modification
 
@@ -220,8 +220,56 @@ The implementation is for A8 nodes. The only different between M3 and A8 M3 is t
 ### Result
 
 - All nodes send serial data within 30 minutes experiment deployment.
-- TBC.
 
 
+## Experiment 55617
+
+### Modification
+
+No Modification. Just start node-a8-2 as dagroot.
+
+### Result
+
+- Without 1 hour test, 10 nodes stops sending packet through serial port. This is less than the experiment done with old M3 driver.
+- Some cells' PDR are very low. Through looking inside the gathered data, the Rx cells on the receiver side somehow disappeared (only one side). As a result, transmission failed without ACK. This is caused by housekeeping which remove Rx cell if no activity is detected with 2* DESYNCTIMEOUT
+ 
+## Experiment 55862 
+
+### Modification
+
+- Remove the RxCell housekeeping functionality. (Don't do anything if we don't know the exactly reason why Rx Cell has no activity.)
+
+### Result
+
+- Some cells' PDR are still low. 
+
+
+
+
+
+
+
+## Experiment 56333
+
+### Modification 
+
+- increase Tx power to -7dbm, 
+- RSSI threshold for stable neighbor is set to (-60)-(-70)
+- if the neighbor rssi is lower than -60, don't record this neighbor
+
+
+### result
+
+- PDR is still low
+- Some nodes have higher PDR at beginning (always 100%), once it lost packet, never recover, finally de-synced.
+	- two reason for this result:
+		- The node has higher timeCorrection before losing packet. Also the nodes is far from dagroot, (lots hop to dagroot.) This may caused the parent's synchronization changed its local time clock, the same happened to the parent node's parent. "Synchronization swing" in paper adaptive sync
+		- for some nodes, which has low rank, needs to forward lots packet to it parent. When the cell is not enough, sfx will trigger 6top to add more. Before the 6top transcation finished, more packet arrived. The nodes has no more buffer to handle other transmission. (like ACK or if 6top failed, no more buffer for a new 6top transcation)
+
+
+### Decision
+
+- make Ka send frequently than the application packet to keep synch'ed
+- Always reserve some buffer for 6top transaction.
  
  
