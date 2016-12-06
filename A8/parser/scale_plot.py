@@ -18,7 +18,7 @@ CELLTYPE_TX               = 1
 CELLTYPE_RX               = 2
 CELLTYPE_TXRX             = 3
 
-MAXBUFFER_SCEHDULE        = 23 # 4 shared 3 serialRx 10 free buffer
+MAXBUFFER_SCEHDULE        = 23 # 10 shared 3 serialRx 10 free buffer
 SLOTFRAME_LENGTH          = 101
 
 def func(x, a, b, c):
@@ -27,12 +27,25 @@ def func(x, a, b, c):
 class plotFigure():
     def __init__(self,logfilePath):
         self.figureData = {}
+        
+        self.moteId = {}
+        
         self.logfilePath = logfilePath
         if not (os.path.exists(os.path.dirname(self.logfilePath+'figures/cellusage_vs_numbercells/'))):
             os.makedirs(os.path.dirname(self.logfilePath+'figures/cellusage_vs_numbercells/'))
         self.getFigureData()
+        self.getMoteId()
         self.plotFigures()
         
+    # ================= helper ==========================
+    
+    def getMoteId(self):
+        for moteid, data in self.figureData['moteId.txt'].items():
+            number = moteid.split('.')[0].split('-')[-1]
+            id     = data['my16bID']
+            self.moteId[int(id,16)] = number
+        # print self.moteId
+            
     def getFigureData(self):
         for filename in os.listdir(self.logfilePath+FIGUREFILE_PATH):
             if filename.endswith('.txt'):
@@ -51,8 +64,13 @@ class plotFigure():
     def plotOneFigure(self,filename):
         if filename == 'cells_vs_rank.txt':
             self.plotCellsVSRankData()
+            self.plotLinksPDR()
+        elif filename == 'timeCorrection.txt':
+            self.plotTimeCorrectionVSRank()
         elif filename == 'networkSyncTime.txt':
             self.plotSynctimeVSNumberMotes()
+        elif filename == 'firstCellTime.txt':
+            self.plotFirstCellTimeVSRank()
         elif filename == 'cellUsage.txt':
             self.plotCellUsageVSNumberCells()
         elif filename == 'cell_pdr.txt':
@@ -88,6 +106,42 @@ class plotFigure():
         plt.title('number cells VS DAGRank {0}'.format('TotalCellsScheduled {0}'.format(totalCells)))
         plt.legend()
         plt.savefig('{0}figures/cell_vs_rank.png'.format(self.logfilePath))
+        
+    def plotLinksPDR(self):
+        plt.figure(9)
+        fig9,ax1 = plt.subplots()
+        linkList = {}
+        
+        for moteid, data in self.figureData['cells_vs_rank.txt'].items():
+            sender = moteid.split('.')[0].split('-')[-1]
+            for i in range(MAXBUFFER_SCEHDULE):
+                if data[i]['type'] == CELLTYPE_TX:
+                    byte0 = (data[i]['neighbor_bodyH']>>48) & 255
+                    byte1 = (data[i]['neighbor_bodyH']>>56)
+                    receiver = self.moteId[byte0*256+byte1]
+                    if not (sender+'->'+receiver in linkList):
+                        linkList[sender+'->'+receiver] = {}
+                        linkList[sender+'->'+receiver]['numTx']     = data[i]['numTx']
+                        linkList[sender+'->'+receiver]['numTxACK']  = data[i]['numTxACK']
+                    else:
+                        linkList[sender+'->'+receiver]['numTx']    += data[i]['numTx']
+                        linkList[sender+'->'+receiver]['numTxACK'] += data[i]['numTxACK']
+            for key in linkList:
+                if linkList[key]['numTx'] == 0:
+                    del linkList[key]
+                else:
+                    linkList[key]['pdr'] = float(linkList[key]['numTxACK'])/float(linkList[key]['numTx'])
+        xData = np.int_([i for i in range(len(linkList))])
+        yData = np.float_([linkList[key]['pdr'] for key in linkList])
+        xl = [key for key in linkList]
+        ax1.bar(xData,yData,label='Link Quality (PDR)')
+        ax1.set_xticklabels(list(xl),rotation=90)
+        fig9.set_size_inches(40.5, 10.5)
+        plt.grid(True)
+        plt.ylabel('PDR')
+        plt.title('link PDR')
+        plt.legend()
+        plt.savefig('{0}figures/linkPDR.png'.format(self.logfilePath))
         
     def plotSynctimeVSNumberMotes(self):
         plt.figure(2)
@@ -220,7 +274,20 @@ class plotFigure():
         fig6.set_size_inches(18.5, 10.5)
         plt.savefig('{0}figures/neighbor_isNoRes.png'.format(self.logfilePath))
                         
-                
+    def plotTimeCorrectionVSRank(self):
+        plt.figure(7)
+        figureData = {}
+        for moteid, data in self.figureData['timeCorrection.txt'].items():
+            pass
+            # figureData[moteid]['myDAGrank']         = data['myDAGrank']['myDAGrank']
+            # figureData[moteid]['maxTC']             = data['timeCorrection']['maxCorrection']
+            # figureData[moteid]['minTC']             = data['timeCorrection']['minCorrection'] 
+            # figureData[moteid]['numSyncAck']        = data['timeCorrection']['numSyncAck'] 
+            # figureData[moteid]['numSyncPkt']        = data['timeCorrection']['numSyncPkt'] 
+        
+    def plotFirstCellTimeVSRank(self):
+        plt.figure(8)
+        
         
 #============= public ===================
                 
