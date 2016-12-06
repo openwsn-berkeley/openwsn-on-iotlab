@@ -23,10 +23,12 @@ class LogfileAnalyzer(object):
         self.errorcount     = {}
         self.scheduletable  = {}
         self.syncTime       = {}
+        self.firstCellTime  = {}
         self.cellUsage      = {}
         self.cellPDR        = {}
         self.moteAddress    = {}
         self.neighbortable  = {}
+        self.timeCorrection = {}
         self.logfilePath    = logfilePath
         
         # analyze
@@ -38,7 +40,9 @@ class LogfileAnalyzer(object):
         with open('{0}analyzeResult/errors.txt'.format(self.logfilePath),'w') as f:
             f.write(str(self.errorcount))
         self.writeToFile('{0}analyzeResult/cells_vs_rank.txt'.format(self.logfilePath),self.scheduletable)
-        self.writeToFile('{0}analyzeResult/networkSyncTime.txt'.format(self.logfilePath),self.syncTime)        
+        self.writeToFile('{0}analyzeResult/timeCorrection.txt'.format(self.logfilePath),self.timeCorrection)
+        self.writeToFile('{0}analyzeResult/networkSyncTime.txt'.format(self.logfilePath),self.syncTime)
+        self.writeToFile('{0}analyzeResult/firstCellTime.txt'.format(self.logfilePath),self.firstCellTime) 
         self.writeToFile('{0}analyzeResult/cellUsage.txt'.format(self.logfilePath),self.cellUsage)
         self.writeToFile('{0}analyzeResult/cell_pdr.txt'.format(self.logfilePath),self.cellPDR)
         self.writeToFile('{0}analyzeResult/isNoResNeigbor.txt'.format(self.logfilePath),self.neighbortable)
@@ -75,6 +79,20 @@ class LogfileAnalyzer(object):
                 self.scheduletable[filename][d['row']] = d
             if 'myDAGrank' in d:
                 self.scheduletable[filename]['myDAGrank']= d
+                
+        # ==== timeCorrection
+        self.timeCorrection[filename] = {}
+        haveTxCell = False
+        for d in oneFileData:
+            if 'minCorrection' in d:
+                self.timeCorrection[filename]['timeCorrection'] = d
+            if 'myDAGrank' in d:
+                self.timeCorrection[filename]['myDAGrank']= d
+            if 'slotOffset' in d and d['type'] == CELLTYPE_TX:
+                haveTxCell = True
+            if 'errcode' in d and d['errcode']==26 and haveTxCell==True:
+                # after mote has Tx cell, stop recording if mote got de-sync'ed
+                break
         
         # ==== network sync Time
         self.syncTime[filename] = {}
@@ -85,6 +103,21 @@ class LogfileAnalyzer(object):
             if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
                     self.syncTime[filename] = d
                     break 
+                    
+        # ==== first cell installed time
+        self.firstCellTime[filename] = {}
+        isFirstCell = False
+        for d in oneFileData:
+            if 'slotOffset' in d and d['type'] == CELLTYPE_TX: 
+                isFirstCell = True
+            if isFirstCell is True and 'myDAGrank' in d:
+                self.firstCellTime[filename]['myDAGrank']= d
+                if 'asn_0_1' in self.firstCellTime[filename].keys():
+                    break
+            if isFirstCell is True and 'asn_0_1' in d and ('row' in d) is False:
+                self.firstCellTime[filename]['asn_0_1'] = d
+                if 'myDAGrank' in self.firstCellTime[filename].keys():
+                    break
                     
         # ==== usage of sixop reserved cells
         self.cellUsage[filename] = []
