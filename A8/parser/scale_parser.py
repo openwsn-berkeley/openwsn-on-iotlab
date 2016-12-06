@@ -179,7 +179,7 @@ class LogfileParser(object):
         elif header['type']==8: # QueueRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BBBBBBBBBBBBBBBBBBBBBBBBB',
+                '<BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
                 (
                     'creator_0',                 # B
                     'owner_0',                   # B
