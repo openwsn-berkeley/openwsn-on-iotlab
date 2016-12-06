@@ -119,7 +119,7 @@ class LogfileAnalyzer(object):
                 if 'asn_0_1' in self.firstCellTime[filename].keys():
                     break
             if isFirstCell is True and 'asn_0_1' in d and ('row' in d) is False:
-                self.firstCellTime[filename]['asn_0_1'] = d
+                self.firstCellTime[filename]['asn'] = d
                 if 'myDAGrank' in self.firstCellTime[filename].keys():
                     break
                     

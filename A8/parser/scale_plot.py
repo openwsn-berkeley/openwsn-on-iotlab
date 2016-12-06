@@ -22,14 +22,18 @@ MAXBUFFER_SCEHDULE        = 23 # 10 shared 3 serialRx 10 free buffer
 SLOTFRAME_LENGTH          = 101
 
 tcData = {}
+firstCellData = {}
 
 # ==== help fucntion
 def func(x, a, b, c):
     return a * np.exp(-b * x) + c
 
                 
-def keyfunc(k):
+def keyfunc1(k):
     return tcData[k]['myDAGrank']
+    
+def keyfunc2(k):
+    return firstCellData[k]['myDAGrank']
 
 # ==== module 
 class plotFigure():
@@ -293,19 +297,37 @@ class plotFigure():
             tcData[id]['myDAGrank']         = data['myDAGrank']['myDAGrank']
             tcData[id]['maxTC']             = data['timeCorrection']
         
-        order = sorted(tcData,key=keyfunc)        
+        order = sorted(tcData,key=keyfunc1)        
         bp = ax.boxplot([tcData[key]['maxTC'] for key in order])
         ax.set_xticklabels([tcData[key]['myDAGrank'] for key in order])
         plt.grid(True)
-        plt.xlabel('rank')
+        plt.xlabel('node rank')
         plt.ylabel('time correction (ticks)')
         plt.title('time correction vs rank')
         # fig6.set_size_inches(18.5, 10.5)
         plt.savefig('{0}figures/timeCorrection.png'.format(self.logfilePath))
         
     def plotFirstCellTimeVSRank(self):
-        plt.figure(8)
-    
+        fig8 = plt.figure(8)
+        ax = fig8.add_subplot(111)
+        for moteid, data in self.figureData['firstCellTime.txt'].items():
+            id = moteid.split('.')[0].split('-')[-1]
+            if len(data)==0:
+                continue
+                
+            firstCellData[id] = {}
+            firstCellData[id]['myDAGrank']  = data['myDAGrank']['myDAGrank']
+            firstCellData[id]['asn']        = 0.015*(data['asn']['asn_2_3']*65536+data['asn']['asn_0_1'])
+            
+        order = sorted(firstCellData,key=keyfunc2)
+        ax.plot([firstCellData[key]['myDAGrank'] for key in order],[firstCellData[key]['asn'] for key in order])
+        # ax.set_xticklabels([firstCellData[key]['myDAGrank'] for key in order])
+        plt.grid(True)
+        plt.xlabel('node rank')
+        plt.ylabel('first cell installed time (seconds)')
+        plt.title('rank VS first cell installed VS number sharded slots')
+        # fig6.set_size_inches(18.5, 10.5)
+        plt.savefig('{0}figures/firstCellTime.png'.format(self.logfilePath))
 
         
 #============= public ===================
