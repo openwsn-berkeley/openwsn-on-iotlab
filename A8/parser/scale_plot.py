@@ -21,9 +21,17 @@ CELLTYPE_TXRX             = 3
 MAXBUFFER_SCEHDULE        = 23 # 10 shared 3 serialRx 10 free buffer
 SLOTFRAME_LENGTH          = 101
 
+tcData = {}
+
+# ==== help fucntion
 def func(x, a, b, c):
     return a * np.exp(-b * x) + c
 
+                
+def keyfunc(k):
+    return tcData[k]['myDAGrank']
+
+# ==== module 
 class plotFigure():
     def __init__(self,logfilePath):
         self.figureData = {}
@@ -275,24 +283,32 @@ class plotFigure():
         plt.savefig('{0}figures/neighbor_isNoRes.png'.format(self.logfilePath))
                         
     def plotTimeCorrectionVSRank(self):
-        plt.figure(7)
-        figureData = {}
+        fig7 = plt.figure(7)
+        ax = fig7.add_subplot(111)
         for moteid, data in self.figureData['timeCorrection.txt'].items():
-            pass
-            # figureData[moteid]['myDAGrank']         = data['myDAGrank']['myDAGrank']
-            # figureData[moteid]['maxTC']             = data['timeCorrection']['maxCorrection']
-            # figureData[moteid]['minTC']             = data['timeCorrection']['minCorrection'] 
-            # figureData[moteid]['numSyncAck']        = data['timeCorrection']['numSyncAck'] 
-            # figureData[moteid]['numSyncPkt']        = data['timeCorrection']['numSyncPkt'] 
+            id = moteid.split('.')[0].split('-')[-1]
+            if id=='2':
+                continue
+            tcData[id] = {}
+            tcData[id]['myDAGrank']         = data['myDAGrank']['myDAGrank']
+            tcData[id]['maxTC']             = data['timeCorrection']
+        
+        order = sorted(tcData,key=keyfunc)        
+        bp = ax.boxplot([tcData[key]['maxTC'] for key in order])
+        ax.set_xticklabels([tcData[key]['myDAGrank'] for key in order])
+        plt.grid(True)
+        plt.xlabel('rank')
+        plt.ylabel('time correction (ticks)')
+        plt.title('time correction vs rank')
+        # fig6.set_size_inches(18.5, 10.5)
+        plt.savefig('{0}figures/timeCorrection.png'.format(self.logfilePath))
         
     def plotFirstCellTimeVSRank(self):
         plt.figure(8)
-        
+    
+
         
 #============= public ===================
-                
-
-
 def main():
     try:
         plotFigure()

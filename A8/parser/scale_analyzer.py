@@ -82,17 +82,21 @@ class LogfileAnalyzer(object):
                 
         # ==== timeCorrection
         self.timeCorrection[filename] = {}
-        haveTxCell = False
+        previousSyncACK = 0
+        previousSyncPkt = 0
         for d in oneFileData:
             if 'minCorrection' in d:
-                self.timeCorrection[filename]['timeCorrection'] = d
+                if previousSyncACK == d['numSyncAck'] and previousSyncPkt == d['numSyncPkt']:
+                    pass
+                else:
+                    previousSyncACK = d['numSyncAck']
+                    previousSyncPkt = d['numSyncPkt']
+                    if 'timeCorrection' in self.timeCorrection[filename]:
+                        self.timeCorrection[filename]['timeCorrection'] += [d['minCorrection']]
+                    else:
+                        self.timeCorrection[filename]['timeCorrection']  = [d['minCorrection']]
             if 'myDAGrank' in d:
-                self.timeCorrection[filename]['myDAGrank']= d
-            if 'slotOffset' in d and d['type'] == CELLTYPE_TX:
-                haveTxCell = True
-            if 'errcode' in d and d['errcode']==26 and haveTxCell==True:
-                # after mote has Tx cell, stop recording if mote got de-sync'ed
-                break
+                self.timeCorrection[filename]['myDAGrank'] = d
         
         # ==== network sync Time
         self.syncTime[filename] = {}
