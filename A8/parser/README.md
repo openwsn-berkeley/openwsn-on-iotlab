@@ -188,7 +188,7 @@ Sixtop:
 
 - Don't remove the parent if there is no activity heard from it.
 - Correct the TIMEOUT of sixtop
-- Only allow one sixtop transaction at one time. (To support multiple transaction, it required to maintain multiple state machine for each sixtop transaction.)
+- Only allow one sixtop transaction at one time. (To support multiple sixtop transaction, it required to maintain multiple state machine for each sixtop transaction.)
 
 
 ### Actions/Ideas
@@ -231,7 +231,7 @@ No Modification. Just start node-a8-2 as dagroot.
 ### Result
 
 - Without 1 hour test, 10 nodes stops sending packet through serial port. This is less than the experiment done with old M3 driver.
-- Some cells' PDR are very low. Through looking inside the gathered data, the Rx cells on the receiver side somehow disappeared (only one side). As a result, transmission failed without ACK. This is caused by housekeeping which remove Rx cell if no activity is detected with 2* DESYNCTIMEOUT
+- lots cells' PDR are very low. Through looking inside the gathered data, the Rx cells on the receiver side somehow disappeared (only one side). As a result, transmission failed without ACK. This is caused by housekeeping which remove Rx cell if no activity is detected with 2* DESYNCTIMEOUT
  
 ## Experiment 55862 
 
@@ -241,21 +241,54 @@ No Modification. Just start node-a8-2 as dagroot.
 
 ### Result
 
-- Some cells' PDR are still low. 
+- lots of cells' PDR are still low. 
 
 
 ---
-## To Be filled
+## Experiment 55994
 
-...
+### Modification
 
-...
+- initialize the cell usage value as target value (60% usage)
+- Don't send DIO if no parent is selected yet. (Since the mote is using a threshold to filter low rssi neighbor) if all neighbor has lower RSSI, the mote may doesn't have parent before receiving some packet from closer neighbor)
+- Only generate DAO when the mote has a Tx cell for sending to parent.
 
-...
+### Result
 
-...
+- lots of cells' PDR are low
+- DE-synchronization happens too much
+	- the de-synchronization is set to 40 seconds and keepalive timeout is set to 30 seconds. The DAO is sent per 30 seconds. The time offset of child may already too much after 30 seconds, which exceeds the guard time.
 
----
+## Experiment 56044 & 56055
+
+### Modification 
+
+- extend the desynchronization and have 20 seconds of Keepalive timeout
+- EB/DIO is sent only mote has a Tx cell (not including DAGroot)
+
+
+### Result
+
+- too much desychronization happens (>4000 times for aroudn 100 nodes)
+- lots Cell's PDR are low.
+
+### Analysis
+
+The time correction is observed large sometime, to make sure the general drift between two motes on IoT-Lab. we did exepriement 56088
+
+### sub Experiment 56088 & 56140 & 56211 & 56217
+
+- time correction is kind large since the packet is sent with long interval.
+
+## Experiment 56331
+
+### Modification
+
+- increase Tx power to -7 dbm to insure the quality of link (use -17 dbm (lowest) before)
+
+### Result
+
+- cells' PDRs are improved certain level, but not that good.
 
 
 ## Experiment 56333
@@ -281,8 +314,7 @@ No Modification. Just start node-a8-2 as dagroot.
 - make Ka send frequently than the application packet to keep synch'ed
 - Always reserve some buffer for 6top transaction.
  
- 
-## Experiment 56337
+## Experiment 56337 (25 nodes)
 
 ### Modification
 
@@ -291,9 +323,9 @@ No Modification. Just start node-a8-2 as dagroot.
 
 ### result
 
-all PDR is high (around 100%)
+almost all cells' PDR are high (around 100%)
 
-## Experiement 56338
+## Experiment 56338 (with 20 minutes)
 
 ### Modification
 
@@ -313,3 +345,44 @@ No modification but with 100 nodes.
 - tip2: modify the rssi threshold value to get a less hop network
 - find the reason why Rx part is not reserved
 - tip3: print out something related to the timeCorrection
+
+## Experiment 56375 (with 60 minutes, >95 nodes)
+
+### pre-setup
+
+- chang the PANID: FACE
+	- during the experiment, I found some nodes I have't reserved(not able because of the ssh connection) appear in the routing graphic (I know it because that one used to work). So there are some motes lost its ssh connection but not reset. They are running the old version of code whcih will influence the experiment. Use a new PANID to filter those motes.
+
+## result
+
+- most cells have good PDR
+
+
+## Experiment 56508
+
+### pre-setup
+
+- chang the PANID : ABCD
+
+### Modification
+
+- don't process received packet if something goes wrong (for example, no free buffer for ACK to send back)
+- update the implementation for reserving packet created by component lower than sixtop_res 
+	- the previous implementation reserve the first 4 entries in queue buffer for high priority component. But if packet to be forwarded will change from a high priority packet (IEEE802154E) to low priority packet (FORWARDING)
+	- new implementation reserve the 4 entries out of 10 queue buffer. once there are number of low priority packet in buffer (Threshold), low priority component is not allowed to reserve free buffer. When packet needs to chang from IEEE802154e to FORWARDING, the packet will be dropped.
+
+## result
+
+- More cells have higher PDRs (183(total 196) cells have PDR percent > 90%)
+- Some Tx cells are reserved on one side but no Rx cell on another side, this may caused by the collision on ACK tranmission
+- Some Rx cells are removed on one side but the Tx cell remained on another side. This may cause the time out of sixtop delete/clear. The delete/clear response is received but the mote has wrong status. Rx side will removed it but Tx side will not do that. Since we force Unicast packet sending on Tx cell if a mote has, this Tx cell will never be deleted.
+
+## Experiement 56600
+
+### Modificaiton
+
+- When getting Unicast packet to send out, sixtop packet have higher priority to be chosen then others.
+
+### Result
+
+TBR
