@@ -84,7 +84,8 @@ class plotFigure():
         elif filename == 'firstCellTime.txt':
             self.plotFirstCellTimeVSRank()
         elif filename == 'cellUsage.txt':
-            self.plotCellUsageVSNumberCells()
+            # self.plotCellUsageVSNumberCells()
+            pass
         elif filename == 'cell_pdr.txt':
             self.plotCellPDR()
         elif filename == 'isNoResNeigbor.txt':
@@ -143,12 +144,14 @@ class plotFigure():
                     del linkList[key]
                 else:
                     linkList[key]['pdr'] = float(linkList[key]['numTxACK'])/float(linkList[key]['numTx'])
-        xData = np.int_([i for i in range(len(linkList))])
-        yData = np.float_([linkList[key]['pdr'] for key in linkList])
-        xl = [key for key in linkList]
-        ax1.bar(xData,yData,label='Link Quality (PDR)')
-        ax1.set_xticklabels(list(xl),rotation=90)
+        order = sorted(linkList)
+        xData = np.int_([i for i in range(len(order))])
+        yData = np.float_([linkList[key]['pdr'] for key in order])
+        ax1.bar(xData,yData,label='Link Quality (PDR on {0} links)'.format(len(order)))
+        ax1.set_xticks([i for i in range(len(order))])
+        ax1.set_xticklabels(order,rotation=90)
         fig9.set_size_inches(40.5, 10.5)
+        ax1.set_ylim(0,1.2)
         plt.grid(True)
         plt.ylabel('PDR')
         plt.title('link PDR')
@@ -169,7 +172,7 @@ class plotFigure():
                 continue
         xData = sorted(asn)
         yData = [i+1 for i in range(len(asn))]
-        plt.plot(xData,yData,'-',label='TotalSyncedMotes {0}'.format(syncedMotes))
+        plt.plot(xData,yData,'^-',label='TotalSyncedMotes {0}'.format(syncedMotes))
         plt.grid(True)
         plt.xlabel('Time (Second)')
         plt.ylabel('Number Of Motes')
@@ -299,12 +302,12 @@ class plotFigure():
         
         order = sorted(tcData,key=keyfunc1)        
         bp = ax.boxplot([tcData[key]['maxTC'] for key in order])
-        ax.set_xticklabels([tcData[key]['myDAGrank'] for key in order])
-        plt.grid(True)
+        ax.set_xticklabels([tcData[key]['myDAGrank'] for key in order],rotation=90)
+        # plt.grid(True)
         plt.xlabel('node rank')
         plt.ylabel('time correction (ticks)')
         plt.title('time correction vs rank')
-        # fig6.set_size_inches(18.5, 10.5)
+        fig7.set_size_inches(40.5, 10.5)
         plt.savefig('{0}figures/timeCorrection.png'.format(self.logfilePath))
         
     def plotFirstCellTimeVSRank(self):
@@ -320,13 +323,12 @@ class plotFigure():
             firstCellData[id]['asn']        = 0.015*(data['asn']['asn_2_3']*65536+data['asn']['asn_0_1'])
             
         order = sorted(firstCellData,key=keyfunc2)
-        ax.plot([firstCellData[key]['myDAGrank'] for key in order],[firstCellData[key]['asn'] for key in order])
-        # ax.set_xticklabels([firstCellData[key]['myDAGrank'] for key in order])
+        ax.plot([firstCellData[key]['myDAGrank'] for key in order],[firstCellData[key]['asn'] for key in order],'o-',label='shared slots=9')
         plt.grid(True)
         plt.xlabel('node rank')
         plt.ylabel('first cell installed time (seconds)')
         plt.title('rank VS first cell installed VS number sharded slots')
-        # fig6.set_size_inches(18.5, 10.5)
+        plt.legend()
         plt.savefig('{0}figures/firstCellTime.png'.format(self.logfilePath))
 
         
