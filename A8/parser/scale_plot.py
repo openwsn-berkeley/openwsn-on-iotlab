@@ -320,7 +320,7 @@ class plotFigure():
                 
             firstCellData[id] = {}
             firstCellData[id]['myDAGrank']  = data['myDAGrank']['myDAGrank']
-            firstCellData[id]['asn']        = 0.015*(data['asn']['asn_2_3']*65536+data['asn']['asn_0_1'])
+            firstCellData[id]['asn']        = 0.015*data['asn']
             
         order = sorted(firstCellData,key=keyfunc2)
         ax.plot([firstCellData[key]['myDAGrank'] for key in order],[firstCellData[key]['asn'] for key in order],'o-',label='shared slots=9')

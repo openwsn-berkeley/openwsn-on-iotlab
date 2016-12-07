@@ -113,14 +113,10 @@ class LogfileAnalyzer(object):
         isFirstCell = False
         for d in oneFileData:
             if 'slotOffset' in d and d['type'] == CELLTYPE_TX: 
-                isFirstCell = True
-            if isFirstCell is True and 'myDAGrank' in d:
+                if not ('asn' in self.firstCellTime[filename]):
+                    self.firstCellTime[filename]['asn'] = 65536*d['lastUsedAsn_2_3']+d['lastUsedAsn_0_1']
+            if 'asn' in self.firstCellTime[filename] and 'myDAGrank' in d:
                 self.firstCellTime[filename]['myDAGrank']= d
-                if 'asn_0_1' in self.firstCellTime[filename].keys():
-                    break
-            if isFirstCell is True and 'asn_0_1' in d and ('row' in d) is False:
-                self.firstCellTime[filename]['asn'] = d
-                if 'myDAGrank' in self.firstCellTime[filename].keys():
                     break
                     
         # ==== usage of sixop reserved cells
