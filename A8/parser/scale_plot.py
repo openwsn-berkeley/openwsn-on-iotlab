@@ -139,11 +139,14 @@ class plotFigure():
                     else:
                         linkList[sender+'->'+receiver]['numTx']    += data[i]['numTx']
                         linkList[sender+'->'+receiver]['numTxACK'] += data[i]['numTxACK']
+            numTxzeroList = {}
             for key in linkList:
                 if linkList[key]['numTx'] == 0:
-                    del linkList[key]
+                    numTxzeroList[key] = 0
                 else:
                     linkList[key]['pdr'] = float(linkList[key]['numTxACK'])/float(linkList[key]['numTx'])
+            for i in numTxzeroList:
+                del linkList[i]
         order = sorted(linkList)
         xData = np.int_([i for i in range(len(order))])
         yData = np.float_([linkList[key]['pdr'] for key in order])
@@ -298,7 +301,7 @@ class plotFigure():
         ax = fig7.add_subplot(111)
         for moteid, data in self.figureData['timeCorrection.txt'].items():
             id = moteid.split('.')[0].split('-')[-1]
-            if id=='2':
+            if not 'timeCorrection' in data:
                 continue
             tcData[id] = {}
             tcData[id]['myDAGrank']         = data['myDAGrank']['myDAGrank']
