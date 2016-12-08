@@ -91,6 +91,8 @@ class LogfileAnalyzer(object):
                 else:
                     previousSyncACK = d['numSyncAck']
                     previousSyncPkt = d['numSyncPkt']
+                    if d['minCorrection'] == -127 or d['minCorrection'] == 127:
+                        continue
                     if 'timeCorrection' in self.timeCorrection[filename]:
                         self.timeCorrection[filename]['timeCorrection'] += [d['minCorrection']]
                     else:

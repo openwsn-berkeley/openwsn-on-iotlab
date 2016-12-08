@@ -56,7 +56,7 @@ class plotFigure():
             number = moteid.split('.')[0].split('-')[-1]
             id     = data['my16bID']
             self.moteId[int(id,16)] = number
-        # print self.moteId
+        # print sorted(self.moteId)
             
     def getFigureData(self):
         for filename in os.listdir(self.logfilePath+FIGUREFILE_PATH):
@@ -215,34 +215,37 @@ class plotFigure():
         cellPresentTime = {}
         PdrData = [[[] for i in range(16)] for j in range(SLOTFRAME_LENGTH)]
         for moteid, data in self.figureData['cell_pdr.txt'].items():
+            id = moteid.split('.')[0].split('-')[-1]
             for cell, pdr in data.items():
                 x = int(cell.split()[0])
                 y = int(cell.split()[1])
                 PdrData[x][y] += [float(pdr)]
                 
-                cell = '({0} {1})'.format(x,y)
+                cell = '{0} {1}'.format(x,y)
                 if cell in avgPdrData:
                     avgPdrData[cell] += [float(pdr)]
                 else:
                     avgPdrData[cell] = [float(pdr)]
                     
                 if cell in moteidList:
-                    moteidList[cell] += [moteid[14:17]]
+                    moteidList[cell] += [id]
                 else:
-                    moteidList[cell] = [moteid[14:17]]
+                    moteidList[cell]  = [id]
                     
                 if cell in cellPresentTime:
                     cellPresentTime[cell] += 1
                 else:
                     cellPresentTime[cell] = 1
-                
+        
         for cell, pdrlist in avgPdrData.items():
             avgPdrData[cell] = sum(pdrlist)/len(pdrlist)
-        line1, = ax1.plot(range(len(avgPdrData)),avgPdrData.values(),'b-',label='cell pdr')
-        line2, = ax2.plot(range(len(cellPresentTime)),cellPresentTime.values(),'r-',label='times cell being selected')
-        ax1.set_xticks(range(len(cellPresentTime)))
-        xl = ["{0} {1}".format(avgPdrData.keys()[i],moteidList[avgPdrData.keys()[i]]) for i in range(len(avgPdrData.keys()))]
-        ax1.set_xticklabels(list(xl),rotation=90)
+            
+        order = sorted(avgPdrData)
+        line1, = ax1.plot([avgPdrData[key] for key in order],'b-',label='cell pdr')
+        line2, = ax2.plot([cellPresentTime[key] for key in order],'r-',label='times cell being selected')
+        ax1.set_xticks(range(len(order)))
+        # ax1.set_xticklabels(['{0} {1}'.format(key,moteidList[key]) for key in order],rotation=90)
+        ax1.set_xticklabels(order,rotation=90)
         plt.xlim(0,len(avgPdrData))
         plt.grid(True)
         ax1.set_xlabel('cells (slotoffset channeloffset)')
@@ -274,15 +277,16 @@ class plotFigure():
         for moteid, data in self.figureData['isNoResNeigbor.txt'].items():
             for row, nb_entry in data.items():
                 if nb_entry['used']==1:
-                    neighborId = hex(nb_entry['addr_128b_6']*255+nb_entry['addr_128b_7'])
+                    neighborId = nb_entry['addr_128b_6']*256+nb_entry['addr_128b_7']
                     if neighborId in isNoResData and nb_entry['isNoRes'] == 1:
                         isNoResData[neighborId] += 1
                     else:
                         if not (neighborId in isNoResData):
                             isNoResData[neighborId] = 0
+        
         plt.plot(range(len(isNoResData)),isNoResData.values())
         plt.grid(True)
-        plt.xticks(range(len(isNoResData)),list(isNoResData.keys()),rotation='vertical')
+        plt.xticks(range(len(isNoResData)),[self.moteId[key] for key in isNoResData.keys()],rotation='vertical')
         plt.xlabel('Mote ID')
         plt.ylabel('Number times marked as \'isNoRes\'')
         plt.title('Number times marked as \'isNoRes\'')
@@ -300,9 +304,9 @@ class plotFigure():
             tcData[id]['myDAGrank']         = data['myDAGrank']['myDAGrank']
             tcData[id]['maxTC']             = data['timeCorrection']
         
-        order = sorted(tcData,key=keyfunc1)        
+        order = sorted(tcData,key=keyfunc1)
         bp = ax.boxplot([tcData[key]['maxTC'] for key in order])
-        ax.set_xticklabels([tcData[key]['myDAGrank'] for key in order],rotation=90)
+        ax.set_xticklabels(['{0} {1}'.format(tcData[key]['myDAGrank'],key)for key in order],rotation=90)
         # plt.grid(True)
         plt.xlabel('node rank')
         plt.ylabel('time correction (ticks)')
