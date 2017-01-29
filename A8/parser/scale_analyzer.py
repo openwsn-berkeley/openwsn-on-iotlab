@@ -119,7 +119,9 @@ class LogfileAnalyzer(object):
                     self.firstCellTime[filename]['asn'] = 65536*d['lastUsedAsn_2_3']+d['lastUsedAsn_0_1']
             if 'asn' in self.firstCellTime[filename] and 'myDAGrank' in d:
                 self.firstCellTime[filename]['myDAGrank']= d
-                break
+                if not (d['myDAGrank'] == 65535):
+                    break
+                    
                     
         # ==== usage of sixop reserved cells
         self.cellUsage[filename] = []
