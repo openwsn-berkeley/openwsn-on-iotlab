@@ -13,7 +13,7 @@ commandList   = {
 'moteprobe' :'cd ~/A8/experiment/; python moteProbe.py &',
 'killpython':'killall python',
 'watchdog'  :'cd ~/A8/experiment/; python watchdog.py &',
-'runrover'  :'cd ~/A8/openwsn-sw/software/openvisualizer/; scons runrover &'
+'runrover'  :'cd ~/A8/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/; python openRoverApp.py &'
 }
 
 # =========================== functions =======================================
@@ -30,7 +30,7 @@ def usage():
     output += "---- moteprobe  cd ~/A8/serialData/; python moteProbe.py &\n"
     output += "---- killpython killall python\n"
     output += "---- watchdog   cd ~/A8/experiment/; python watchdog.py &\n"
-    output += "---- runrover   cd ~/A8/openwsn-sw/software/openvisualizer/; scons runrover &\n"
+    output += "---- runrover   cd ~/A8/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/; python openRoverApp.py &\n"
     output += "(you also can type the command directly)\n"
     print output
     
