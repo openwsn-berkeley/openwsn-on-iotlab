@@ -379,10 +379,28 @@ No modification but with 100 nodes.
 
 ## Experiement 56600
 
-### Modificaiton
+### Modification
 
 - When getting Unicast packet to send out, sixtop packet have higher priority to be chosen then others.
 
 ### Result
 
 TBR
+
+## Experiment 59362
+
+### Modification
+
+- EB piggyback feature is removed because of security issue
+- add a scheudling function with hash table to reserve shared cell for sixtop 
+- TX power = -3dbm LOWRSSI THESHOLD = -70
+
+### Result
+
+- Lots of nodes got de-sync'ed
+- It seems less information printed out, may because of de-sync'ed (run rover)
+
+## Analysis
+
+- Increase LOWRSSITHESHOLD to -80dbm
+- the EB piggyback feature disable make the DIO receiving channce low, hard to have a rank and chose a parent
