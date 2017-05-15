@@ -174,3 +174,36 @@ Then on iot-lab server, type in the following command:
 Now you can open the Openvisualizer web interface through the browser on your local machine with following address.
 
 	http://localhost:1234/
+
+### Run Openvisualizer with Rover mode
+
+	chang@saclay:~/A8/experiment$ python cmd_multpleNode.py -c runrover -s 1
+	>>> ssh -n -f -o "StrictHostKeyChecking no" root@node-a8-105 'source /etc/profile; cd ~/A8/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/; python openRoverApp.py &'
+
+Then you need go over all steps at [running a network](https://openwsn.atlassian.net/wiki/display/OW/Running+a+Network) before **Start an Experiment** section. After you done that type the following command: 
+    
+    (venv)chang@saclay:~$cd A8/openwsn-sw/software/openvisualizer
+    (venv)chang@saclay:~/A8/openwsn-sw/software/openvisualizer$scons runweb --rover --port=1234
+
+Make sure you are in the virtual environment, indicated by the *(venv)* prefix on the commandline. Also make sure the iot-lab saclay site is ssh'ed with forwarding on 1234 port.
+
+Now open http://localhost:1234 on your local computer in your browser and navigate to **Rovers** page. 
+
+Then go over the steps at [Remote+control+your+mote+through+raspberry+pi](https://openwsn.atlassian.net/wiki/display/OW/Remote+control+your+mote+through+raspberry+pi) starting from **Play** section step 4. Choose the 
+*eth0: 2001:660:3207:4bf::17* 
+from the drop down list.
+
+Create a file containing all nodes you downloaded with firmware and separate them with comma(,).
+
+Here is an example of A8-M3 node address:  2001:660:3207:400::X
+*2001:660:3207:400* is the ipv6 prefix with is shared by all A8 nodes.
+X is the node id in hex format. 
+E.g. the ipv6 address of A8 node-100 is 
+2001:660:3207:400::64.
+
+Following is the example of the node list file to upload (node 100, node 101, node 102,node 103, node 104): 
+
+> 2001:660:3207:400::64,2001:660:3207:400::65,2001:660:3207:400::66,2001:660:3207:400::67,2001:660:3207:400::68
+
+
+If everything goes well you will able to see the serial status information coming into Openvisualizer on **Motes** page.
