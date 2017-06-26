@@ -136,6 +136,17 @@ The result of flashing is recorded in flash.log file. It records the number of n
 
 The software has to be installed on a8-m3-node as it requires *sudo* permission and there is not password on loged iot-lab server. Be default the command will log into a8-node-9 to install the software. Since the software is shared with all nodes, it not required to install again on each a8 nodes.
 
+Note: It's recommended to zip the directory: /usr/lib/python2.7/site-packages/ into a tar.gz file under A8 folder. Since some packages may need compiling for installation and it takes too long time to finish. Unzip the tar.gz file to overwriten the /usr/lib/python2.7/site-packages will do that exactly same thing as 'python install.py' but with much less time.
+
+To zip the site-packages folder: 
+
+	cd /usr/lib/python2.7/
+	tar -czvf site-pacages.tar.gz site-packages/
+	
+To unzip the tar.gz file:
+	 
+	tar -xjf site-pacages.tar.gz -C /usr/lib/python2.7/
+
 ### Run moteProbe.py on multiple nodes
 
 	chang@saclay:~/A8/experiment$ python cmd_multpleNode.py -c moteprobe -s 1 -e 17
