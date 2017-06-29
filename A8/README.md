@@ -140,12 +140,13 @@ Note: It's recommended to zip the directory: /usr/lib/python2.7/site-packages/ i
 
 To zip the site-packages folder: 
 
-	cd /usr/lib/python2.7/
-	tar -czvf site-pacages.tar.gz site-packages/
+	chang@saclay:~/A8$ tar -czvf site-packages.tar.gz /usr/lib/python2.7/site-packages/
 	
 To unzip the tar.gz file:
-	 
-	tar -xjf site-pacages.tar.gz -C /usr/lib/python2.7/
+	
+	chang@saclay:~/A8$ ssh root@node-a8-2
+	root@node-a8-2:~# cd A8/
+	root@node-a8-2:~/A8# tar -xzf site-packages.tar.gz -C /
 
 ### Run moteProbe.py on multiple nodes
 
