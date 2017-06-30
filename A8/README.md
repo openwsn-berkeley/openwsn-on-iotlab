@@ -101,6 +101,24 @@ If you see experiment information like below, the experiment is accomplished. If
 
 *Note: you may notice that the reserved nodes is not from 1 to 10 since they are not available on IoT-Lab. Remember the start of the reserved nodes (a8-1) and the end (a8-16), which will be used later.*
 
+### Install dependency software
+
+	chang@saclay:~/A8/experiment$ python install.py
+
+The software has to be installed on a8-m3-node as it requires *sudo* permission and there is not password on loged iot-lab server. Be default the command will log into a8-node-9 to install the software. Since the software is shared with all nodes, it not required to install again on each a8 nodes.
+
+Note: It's recommended to zip the directory: /usr/lib/python2.7/site-packages/ into a tar.gz file under A8 folder. Since some packages may need compiling for installation and it takes too long time to finish. Unzip the tar.gz file to overwriten the /usr/lib/python2.7/site-packages will do that exactly same thing as 'python install.py' but with much less time.
+
+To zip the site-packages folder: 
+
+	chang@saclay:~/A8$ tar -czvf site-packages.tar.gz /usr/lib/python2.7/site-packages/
+	
+To unzip the tar.gz file:
+	
+	chang@saclay:~/A8$ ssh root@node-a8-2
+	root@node-a8-2:~# cd A8/
+	root@node-a8-2:~/A8# tar -xzf site-packages.tar.gz -C /
+
 ### Program multiple nodes
 	
 It may take a little while that the reserved nodes are ready to be used. Use 
@@ -129,24 +147,6 @@ The result of flashing is recorded in flash.log file. It records the number of n
 	1 2 3 5 6 7 9 14 16
 	---failed List---
 	4 10 11 12 13 15
-
-### Install dependency software
-
-	chang@saclay:~/A8/experiment$ python install.py
-
-The software has to be installed on a8-m3-node as it requires *sudo* permission and there is not password on loged iot-lab server. Be default the command will log into a8-node-9 to install the software. Since the software is shared with all nodes, it not required to install again on each a8 nodes.
-
-Note: It's recommended to zip the directory: /usr/lib/python2.7/site-packages/ into a tar.gz file under A8 folder. Since some packages may need compiling for installation and it takes too long time to finish. Unzip the tar.gz file to overwriten the /usr/lib/python2.7/site-packages will do that exactly same thing as 'python install.py' but with much less time.
-
-To zip the site-packages folder: 
-
-	chang@saclay:~/A8$ tar -czvf site-packages.tar.gz /usr/lib/python2.7/site-packages/
-	
-To unzip the tar.gz file:
-	
-	chang@saclay:~/A8$ ssh root@node-a8-2
-	root@node-a8-2:~# cd A8/
-	root@node-a8-2:~/A8# tar -xzf site-packages.tar.gz -C /
 
 ### Run moteProbe.py on multiple nodes
 
