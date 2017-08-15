@@ -219,3 +219,5 @@ Following is the example of the node list file to upload (node 100, node 101, no
 
 
 If everything goes well you will able to see the serial status information coming into Openvisualizer on **Motes** page.
+
+***Note: If rover failed to get information from motes, try to reprogram all motes and start the Openvisualizer again with rover mode.*** 
