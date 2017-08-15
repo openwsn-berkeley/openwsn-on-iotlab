@@ -13,7 +13,8 @@ commandList   = {
 'moteprobe' :'cd ~/A8/experiment/; python moteProbe.py &',
 'killpython':'killall python',
 'watchdog'  :'cd ~/A8/experiment/; python watchdog.py &',
-'runrover'  :'cd ~/A8/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/; python openRoverApp.py &'
+'runrover'  :'cd ~/A8/openwsn-sw/software/openvisualizer/bin/openVisualizerApp/; python openRoverApp.py &',
+'flashdagroot'     :'flash_a8_m3 A8/03oos_openwsn_prog_dagroot.exe'
 }
 
 # =========================== functions =======================================
@@ -24,7 +25,7 @@ def syscall(cmd):
 
 def usage():
     output = "issue commands to multiple nodes\n"
-    output += "issue_command.py -c <command> -s <startNodeId> -e <endNoteId>\n"
+    output += "issue_command.py -c <command> -s <startNodeId> -e <endNoteId> -d <dagrootId>\n"
     output += "==== shortCMD = real command ====\n"
     output += "---- flash      flash_a8_m3 A8/03oos_openwsn_prog.exe\n"
     output += "---- moteprobe  cd ~/A8/serialData/; python moteProbe.py &\n"
@@ -60,15 +61,17 @@ def record(cmd,start,end):
         
 class multipleNodeCommand(threading.Thread):
 
-    def __init__(self,id,command):
+    def __init__(self,id,command, dagroot):
     
-        self.id       = id
-        self.status   = False
+        self.id        = id
+        self.isdagroot = (id == dagroot)
+        self.status    = False
+        self.command   = command
         
         if command in commandList:
-            self.command = commandList[command]
+            self.command_desc = commandList[command]
         else:
-            self.command = command
+            self.command_desc = command
         
         self.goOn = True
         
@@ -79,9 +82,13 @@ class multipleNodeCommand(threading.Thread):
 # =========================== thread ==========================================
     def run(self):
         
-        if syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; {1}'\n".format(self.id,self.command)) == 0:
-            self.status = True
-            
+        if self.command == 'flash' and self.isdagroot:
+            if syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; {1}'\n".format(self.id,commandList['flashdagroot'])) == 0:
+                self.status = True
+        else:
+            if syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; {1}'\n".format(self.id,self.command_desc)) == 0:
+                self.status = True
+        
         self.goOn = False
             
     def getId(self):
@@ -99,7 +106,7 @@ def main():
     # get options
     cmd,start,end = None, None, None
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:s:e:h', ['cmd=', 'start=', 'end=', 'help'])
+        opts, args = getopt.getopt(sys.argv[1:], 'c:s:e:d:h', ['cmd=', 'start=', 'end=', 'dagroot=', 'help'])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -114,6 +121,8 @@ def main():
             start = int(arg)
         elif opt in ('-e', '--end'):
             end = int(arg)
+        elif opt in ('-d', '--dagroot'):
+            dagroot = int(arg)
         else:
             usage()
             sys.exit(2)
@@ -126,7 +135,7 @@ def main():
         end = start + 1
         
     # start jobs
-    nodelist = [multipleNodeCommand(i,cmd) for i in range(start,end)]
+    nodelist = [multipleNodeCommand(i,cmd, dagroot) for i in range(start,end)]
     for node in nodelist:
         id = node.getId()
         while node.getgoOn():
