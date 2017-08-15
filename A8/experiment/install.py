@@ -11,5 +11,5 @@ if len(sys.argv)>1:
 else:
     node = 1
     
-if syscall('ssh -o \"StrictHostKeyChecking no\" root@node-a8-{0} \'source /etc/profile; sudo pip install openwsn-coap\''.format(node)) != 0:
+if syscall('ssh -o \"StrictHostKeyChecking no\" root@node-a8-{0} \'source /etc/profile; pip install openwsn-coap\''.format(node)) != 0:
     print "\nExample: python install.py <nodeId>\n"
