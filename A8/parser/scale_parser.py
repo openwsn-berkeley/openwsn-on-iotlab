@@ -147,7 +147,7 @@ class LogfileParser(object):
         elif header['type']==6: # ScheduleRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BHBBBBQQBBBBHHHB',
+                '<BHBBBBQQBBBBHH',
                 (
                     'row',                       # B
                     'slotOffset',                # H 
@@ -163,8 +163,6 @@ class LogfileParser(object):
                     'lastUsedAsn_4',             # B
                     'lastUsedAsn_2_3',           # H
                     'lastUsedAsn_0_1',           # H
-                    'usageBitMap',               # H
-                    'bitMapIndex',               # B
                 ),
             )
         elif header['type']==7: # Backoff
@@ -216,30 +214,17 @@ class LogfileParser(object):
         elif header['type']==9: # NeighborsRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BBBBBBBBBBBBBBBBBBBBBBHbBBBBBHHBB',
+                '<BBBBBBBQQHbBBBBBHHBBBB',
                 (
                     'row',                       # B
                     'used',                      # B
+                    'insecure',                  # B
                     'parentPreference',          # B
                     'stableNeighbor',            # B
                     'switchStabilityCounter',    # B
                     'addr_type',                 # B
-                    'addr_128b_0',               # B
-                    'addr_128b_1',               # B
-                    'addr_128b_2',               # B
-                    'addr_128b_3',               # B
-                    'addr_128b_4',               # B
-                    'addr_128b_5',               # B
-                    'addr_128b_6',               # B
-                    'addr_128b_7',               # B
-                    'addr_128b_8',               # B
-                    'addr_128b_9',               # B
-                    'addr_128b_10',              # B
-                    'addr_128b_11',              # B
-                    'addr_128b_12',              # B
-                    'addr_128b_13',              # B
-                    'addr_128b_14',              # B
-                    'addr_128b_15',              # B                     
+                    'addr_bodyH',                # Q
+                    'addr_bodyL',                # Q
                     'DAGrank',                   # H
                     'rssi',                      # b
                     'numRx',                     # B
@@ -249,8 +234,10 @@ class LogfileParser(object):
                     'asn_4',                     # B
                     'asn_2_3',                   # H
                     'asn_0_1',                   # H
-                    'joinprio',                  # B
-                    'isNoRes',                   # B
+                    'joinPrio',                  # B
+                    'f6PNORES',                  # B
+                    'sixtopGEN',                 # B
+                    'sixtopSeqNum',              # B
                 ),
             )
         else:
