@@ -86,6 +86,9 @@ class multipleNodeCommand(threading.Thread):
             if syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; {1}'\n".format(self.id,commandList['flashdagroot'])) == 0:
                 self.status = True
         else:
+            if self.command == 'runrover':
+                # kill the port first in case it's in use.
+                syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; kill -9 $(lsof -t -i:5683)'".format(self.id))
             if syscall("ssh -n -f -o \"StrictHostKeyChecking no\" root@node-a8-{0} 'source /etc/profile; {1}'\n".format(self.id,self.command_desc)) == 0:
                 self.status = True
         
