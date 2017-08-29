@@ -3,6 +3,7 @@ import sys
 import getopt
 import os
 import threading
+import time
 
 # =========================== variable ========================================
 
@@ -56,6 +57,8 @@ def record(cmd,start,end):
             nodelist += "{0} ".format(failedNode[i])
         f.write("---failed List---\n")
         f.write(nodelist+'\n')
+        timestampe = [i for i in time.localtime()]
+        f.write("recorded at {0}/{1} {2}:{3}:{4}\n".format(timestampe[1],timestampe[2],timestampe[3],timestampe[4],timestampe[5],))
 
 # =========================== class ===========================================
         
