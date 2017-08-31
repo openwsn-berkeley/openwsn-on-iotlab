@@ -37,24 +37,27 @@ def usage():
     print output
     
 # record command result in to file
-def record(cmd,start,end):
+def record(cmd,start,end, list_node):
     with open('{0}.log'.format(cmd),'a') as f:
         f.write("\n")
         # ==== statistic
         f.write("==== Flashing statistic result ====\n")
-        f.write("Try to flash {0} nodes:\n".format(end-start))
+        if list_node is None:
+            f.write("Try to flash {0} nodes:\n".format(end-start))
+        else:
+            f.write("Try to flash {0} nodes:\n".format(len(list_node.split(','))))
         f.write("Success: {0} Failed: {1}\n".format(len(successNode),len(failedNode)))
         # ==== successful node list
         nodelist = ""
         for i in range(len(successNode)):
-            nodelist += "{0} ".format(successNode[i])
+            nodelist += "{0},".format(successNode[i])
         f.write("---Success List---\n")
         f.write(nodelist+'\n')
 
         # ==== failed node list
         nodelist = ""
         for i in range(len(failedNode)):
-            nodelist += "{0} ".format(failedNode[i])
+            nodelist += "{0},".format(failedNode[i])
         f.write("---failed List---\n")
         f.write(nodelist+'\n')
         timestampe = [i for i in time.localtime()]
@@ -110,9 +113,9 @@ class multipleNodeCommand(threading.Thread):
 def main():
     
     # get options
-    cmd,start,end = None, None, None
+    cmd,start,end,dagroot,nodelist = None, None, None, None, None
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:s:e:d:h', ['cmd=', 'start=', 'end=', 'dagroot=', 'help'])
+        opts, args = getopt.getopt(sys.argv[1:], 'c:s:e:d:l:h', ['cmd=', 'start=', 'end=', 'list=', 'dagroot=', 'help'])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -129,19 +132,25 @@ def main():
             end = int(arg)
         elif opt in ('-d', '--dagroot'):
             dagroot = int(arg)
+        elif opt in ('-l', '--list'):
+            nodelist = arg
         else:
             usage()
             sys.exit(2)
         
     # check valid fo options
-    if cmd == None or start == None:
+    if nodelist == None and (cmd == None or start == None):
         usage()
         sys.exit(2)
-    elif end is None:
+    elif end is None and nodelist is None:
         end = start + 1
         
     # start jobs
-    nodelist = [multipleNodeCommand(i,cmd, dagroot) for i in range(start,end)]
+    list_backup = nodelist
+    if list_backup is None:
+        nodelist = [multipleNodeCommand(i,cmd, dagroot) for i in range(start,end)]
+    else:
+        nodelist = [multipleNodeCommand(i,cmd, dagroot) for i in [int(i) for i in nodelist.split(',')]]
     for node in nodelist:
         id = node.getId()
         while node.getgoOn():
@@ -152,7 +161,8 @@ def main():
             failedNode.append(id)
     
     # record command result
-    record(cmd,start,end)
+    record(cmd,start,end, list_backup)
+        
 
 
 # ==== start from here
