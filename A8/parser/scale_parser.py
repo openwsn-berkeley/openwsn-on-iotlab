@@ -177,7 +177,7 @@ class LogfileParser(object):
         elif header['type']==8: # QueueRow
             payload = self.parseHeader(
                 frame[3:],
-                '<BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+                '<BBBBBBBBBBBBBBBBBBBB',
                 (
                     'creator_0',                 # B
                     'owner_0',                   # B
@@ -199,16 +199,6 @@ class LogfileParser(object):
                     'owner_8',                   # B
                     'creator_9',                 # B
                     'owner_9',                   # B
-                    'creator_10',                # B
-                    'owner_10',                  # B
-                    'creator_11',                # B
-                    'owner_11',                  # B
-                    'creator_12',                # B
-                    'owner_12',                  # B
-                    'creator_13',                # B
-                    'owner_13',                  # B
-                    'creator_14',                # B
-                    'owner_14',                  # B
                 ),
             )
         elif header['type']==9: # NeighborsRow
@@ -266,6 +256,7 @@ class LogfileParser(object):
         except:
             with open('parser.log','a') as f:
                 f.write(str([b for b in bytes]))
+            print formatString
             returnVal = {}
         return returnVal
 
