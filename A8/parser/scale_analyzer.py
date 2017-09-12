@@ -1,192 +1,222 @@
 #!/usr/bin/python
+import os
 import time
 import traceback
 import StackDefines
-import pprint
-import ast
-import os
+import multiprocessing
+import threading
+import matplotlib.pyplot as plt
+import numpy as np
 
 #============================ defines =========================================
 
-CELLTYPE_OFF              = 0
-CELLTYPE_TX               = 1
-CELLTYPE_RX               = 2
-CELLTYPE_TXRX             = 3
+printLock = threading.Lock()
+LOGFILE_PATH = 'nodeoutput/'
+# LOGFILE_PATH = 'node_test/'
+CELLTYPE_TX  = 1
 
-SLOTFRAME_LENGTH          = 101
-
-#============================ class ===========================================
-class LogfileAnalyzer(object):
+#============================ functions =======================================
+def analyzeOneFile_rank_parent_txcell_vs_time(logfile, cpuid, figure_identifier):
     
-    def __init__(self,logfilePath):
-
-        self.errorcount     = {}
-        self.scheduletable  = {}
-        self.syncTime       = {}
-        self.firstCellTime  = {}
-        self.cellUsage      = {}
-        self.cellPDR        = {}
-        self.moteAddress    = {}
-        self.neighbortable  = {}
-        self.timeCorrection = {}
-        self.logfilePath    = logfilePath
-        
-        # analyze
-        self.analyzeAllFiles()
-        
-        # write result to files
-        if not (os.path.exists(os.path.dirname(self.logfilePath+'analyzeResult/'))):
-            os.makedirs(os.path.dirname(self.logfilePath+'analyzeResult/'))
-        with open('{0}analyzeResult/errors.txt'.format(self.logfilePath),'w') as f:
-            f.write(str(self.errorcount))
-        self.writeToFile('{0}analyzeResult/cells_vs_rank.txt'.format(self.logfilePath),self.scheduletable)
-        self.writeToFile('{0}analyzeResult/timeCorrection.txt'.format(self.logfilePath),self.timeCorrection)
-        self.writeToFile('{0}analyzeResult/networkSyncTime.txt'.format(self.logfilePath),self.syncTime)
-        self.writeToFile('{0}analyzeResult/firstCellTime.txt'.format(self.logfilePath),self.firstCellTime) 
-        self.writeToFile('{0}analyzeResult/cellUsage.txt'.format(self.logfilePath),self.cellUsage)
-        self.writeToFile('{0}analyzeResult/cell_pdr.txt'.format(self.logfilePath),self.cellPDR)
-        self.writeToFile('{0}analyzeResult/isNoResNeigbor.txt'.format(self.logfilePath),self.neighbortable)
-        self.writeToFile('{0}analyzeResult/moteId.txt'.format(self.logfilePath),self.moteAddress)
-    
-    def analyzeAllFiles(self):
-        for filename in os.listdir(self.logfilePath):
-            if filename.endswith('.parsed'):
-                print 'Analyzing {0}...'.format(filename),
-                self.analyzeOneFile(self.logfilePath+filename)
-                print 'done.'
-
-    def analyzeOneFile(self,filename):
-        with open(filename,'r') as f:
-            oneFileData = []
-            for line in f:
-                oneFileData += [ast.literal_eval(line)]
-            
-        # ==== how many errors?
-        for d in oneFileData:
-            if 'errcode' in d:
-                errstring = StackDefines.errorDescriptions[d['errcode']]
-                if d['errcode'] == 60:
-                    rc,sm = StackDefines.sixtop_returncode[d['arg1']],StackDefines.sixtop_statemachine[d['arg2']]
-                    errstring = errstring.format(rc,sm)
-                if errstring not in self.errorcount:
-                    self.errorcount[errstring] = 0
-                self.errorcount[errstring] += 1
-        
-        # ==== schedule vs rank
-        self.scheduletable[filename] = {}
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                self.scheduletable[filename][d['row']] = d
-            if 'myDAGrank' in d:
-                self.scheduletable[filename]['myDAGrank']= d
-                
-        # ==== timeCorrection
-        self.timeCorrection[filename] = {}
-        previousSyncACK = 0
-        previousSyncPkt = 0
-        for d in oneFileData:
-            if 'minCorrection' in d:
-                if previousSyncACK == d['numSyncAck'] and previousSyncPkt == d['numSyncPkt']:
-                    pass
-                else:
-                    previousSyncACK = d['numSyncAck']
-                    previousSyncPkt = d['numSyncPkt']
-                    if d['minCorrection'] == -127 or d['minCorrection'] == 127:
-                        continue
-                    if 'timeCorrection' in self.timeCorrection[filename]:
-                        self.timeCorrection[filename]['timeCorrection'] += [d['minCorrection']]
-                    else:
-                        self.timeCorrection[filename]['timeCorrection']  = [d['minCorrection']]
-            if 'myDAGrank' in d:
-                self.timeCorrection[filename]['myDAGrank'] = d
-        
-        # ==== network sync Time
-        self.syncTime[filename] = {}
-        isSynced = False
-        for d in oneFileData:
-            if 'isSync' in d and d['isSync'] == 1:
-                isSynced = True
-            if isSynced is True and 'asn_0_1' in d and ('row' in d) is False:
-                    self.syncTime[filename] = d
-                    break 
-                    
-        # ==== first cell installed time
-        self.firstCellTime[filename] = {}
-        isFirstCell = False
-        for d in oneFileData:
-            if 'slotOffset' in d and d['type'] == CELLTYPE_TX: 
-                if not ('asn' in self.firstCellTime[filename]):
-                    self.firstCellTime[filename]['asn'] = 65536*d['lastUsedAsn_2_3']+d['lastUsedAsn_0_1']
-            if 'asn' in self.firstCellTime[filename] and 'myDAGrank' in d:
-                self.firstCellTime[filename]['myDAGrank']= d
-                if not (d['myDAGrank'] == 65535):
-                    break
-                    
-                    
-        # ==== usage of sixop reserved cells
-        self.cellUsage[filename] = []
-        slotFrameCount         = 0
-        cellusagePerSlotFrame  = 0
-        cellPerSlotframe       = 0
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['type'] == CELLTYPE_OFF:
-                    continue
-                if d['slotOffset'] == 0 and d['type'] == CELLTYPE_TXRX:
-                    self.cellUsage[filename] += [(slotFrameCount,cellusagePerSlotFrame,cellPerSlotframe)]
-                    cellusagePerSlotFrame   = 0
-                    cellPerSlotframe        = 0
-                    slotFrameCount         += 1
-                    continue
-                if d['type'] == CELLTYPE_TX:
-                    cellusagePerSlotFrame += countOneInBinary(d['usageBitMap'])
-                    cellPerSlotframe      += 1
-        
-        # ==== PDR statistic of sixtop reserved cells
-        self.cellPDR[filename] = {}
-        for d in oneFileData:
-            if 'slotOffset' in d:
-                if d['type'] == CELLTYPE_TX:
-                    if d['numTx'] != 0:
-                        self.cellPDR[filename]['{0} {1}'.format(d['slotOffset'],d['channelOffset'])] = float(d['numTxACK'])/float(d['numTx'])
-                        
-        # ==== last neighbor table
-        self.neighbortable[filename] = {}
-        for d in oneFileData:
-            if 'isNoRes' in d:
-                self.neighbortable[filename][d['row']] = d
-        
-        # ==== mote mapping
-        self.moteAddress[filename] = {}
-        for d in oneFileData:
-            if 'my16bID' in d:
-                self.moteAddress[filename]['my16bID'] = hex(d['my16bID'])
-
-    def writeToFile(self,filename,data):
-        with open(filename,'w') as f:
-            pp = pprint.PrettyPrinter(indent=4)
-            f.write(pp.pformat(data))
-    
-
-#============================ main ============================================
-
-def main():
     try:
-        LogfileAnalyzer(LOGFILE_PATH)
-        raw_input("Script ended normally. Press Enter to close.")
+        dict_rank_parent_txcell_vs_asn = {'DAGrank':[], 'parent':{}, 'num_parents': [], 'slotOffset':{}, 'num_txcell': [], 'minutes':[],'lowestRank':[]}
+        with open(logfile,'r') as file:
+            for line in file:
+                dict_line = eval(line)
+                if 'myDAGrank' in dict_line:
+                    dict_rank_parent_txcell_vs_asn['DAGrank'].append(dict_line['myDAGrank'])
+                if ('addr_bodyH' in dict_line):
+                    if (dict_line['parentPreference'] > 0):
+                        dict_rank_parent_txcell_vs_asn['parent'].update({dict_line['row']:dict_line['addr_bodyH']})
+                    else:
+                        if dict_line['row'] in dict_rank_parent_txcell_vs_asn['parent']:
+                            del dict_rank_parent_txcell_vs_asn['parent'][dict_line['row']]
+                    dict_rank_parent_txcell_vs_asn['num_parents'].append(len(dict_rank_parent_txcell_vs_asn['parent']))
+                    if (dict_line['parentPreference'] == 2):
+                        if dict_line['numTxACK'] == 0:
+                            rankIncrease = (3*16-2) * 256
+                        else:
+                            rankIncrease = (3*dict_line['numTx']/dict_line['numTxACK']-2) * 256
+                        dict_rank_parent_txcell_vs_asn['lowestRank'].append(dict_line['DAGrank']+rankIncrease)
+                    else:
+                        if len(dict_rank_parent_txcell_vs_asn['lowestRank'])>0:
+                            # add the previous lowest rank for scale the list matching the scale of time
+                            dict_rank_parent_txcell_vs_asn['lowestRank'].append(dict_rank_parent_txcell_vs_asn['lowestRank'][-1])
+                        else:
+                            dict_rank_parent_txcell_vs_asn['lowestRank'].append(65535)
+                if ('slotOffset' in dict_line):
+                    if (dict_line['type'] == CELLTYPE_TX):
+                        dict_rank_parent_txcell_vs_asn['slotOffset'].update({dict_line['row']:dict_line['slotOffset']})
+                    else:
+                        if dict_line['row'] in dict_rank_parent_txcell_vs_asn['slotOffset']:
+                            del dict_rank_parent_txcell_vs_asn['slotOffset'][dict_line['row']]
+                    dict_rank_parent_txcell_vs_asn['num_txcell'].append(len(dict_rank_parent_txcell_vs_asn['slotOffset']))
+                elif ('asn_0_1' in dict_line) and (('addr_type' in dict_line) is False ):
+                    dict_rank_parent_txcell_vs_asn['minutes'].append((dict_line['asn_0_1'] + 65536 * dict_line['asn_2_3'])*0.015/60)
+        
+        with printLock:
+            print "gathering data from file {0} Done!".format(logfile)
+        
+        fig, ax1 = plt.subplots()
+        min_x_scale = min(len(dict_rank_parent_txcell_vs_asn['minutes']),len(dict_rank_parent_txcell_vs_asn['DAGrank']),len(dict_rank_parent_txcell_vs_asn['num_parents']),len(dict_rank_parent_txcell_vs_asn['lowestRank']))
+        ax1.plot(dict_rank_parent_txcell_vs_asn['minutes'][:min_x_scale],dict_rank_parent_txcell_vs_asn['lowestRank'][:min_x_scale],'r-')
+        ax1.set_xlabel('time (minutes)')
+        ax1.set_ylabel('lowestRank')
+        ax1.set_ylim(0,70000)
+        
+        ax2 = ax1.twinx()
+        ax2.plot(dict_rank_parent_txcell_vs_asn['minutes'][:min_x_scale],dict_rank_parent_txcell_vs_asn['num_parents'][:min_x_scale],'b-')
+        ax2.plot(dict_rank_parent_txcell_vs_asn['minutes'][:min_x_scale],dict_rank_parent_txcell_vs_asn['num_txcell'][:min_x_scale],'g-')
+        ax2.set_ylabel('num_parents/num_txcell')
+        ax2.set_ylim(-1,6)
+        plt.savefig('figures/{0}_rank-parent-txcell-vs-time.png'.format(figure_identifier))
+        
     except Exception as err:
         print traceback.print_exc()
-        raw_input("Script CRASHED. Press Enter to close.")
 
-#============================ helper ==========================================
-
-def countOneInBinary(number):
-    count = 0
-    while (number>0):
-        count   = count+1;
-        number  = number & (number-1);
+def analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(logfile, cpuid, figure_identifier):
+    
+    try:
+        dict_data = {'sync_time':0, 'lowestRank':[], 'dc': 0, 'tc':[], 'cell_install_delay': []}
+        synced         = False
+        cell_installed = False
+        with open(logfile,'r') as file:
+            for line in file:
+                dict_line = eval(line)
+                if ('asn_0_1' in dict_line) and (('addr_type' in dict_line) is False ):
+                    if synced is False:
+                        dict_data['sync_time']          = (dict_line['asn_0_1'] + 65536 * dict_line['asn_2_3'])*0.015
+                    if cell_installed is False:
+                        dict_data['cell_install_delay'] = (dict_line['asn_0_1'] + 65536 * dict_line['asn_2_3'])*0.015
+                if ('isSync' in dict_line) and dict_line['isSync'] == 1:
+                    synced = True
+                if ('addr_bodyH' in dict_line):
+                    if (dict_line['parentPreference'] == 2):
+                        if dict_line['numTxACK'] == 0:
+                            rankIncrease = (3*16-2) * 256
+                        else:
+                            rankIncrease = (3*dict_line['numTx']/dict_line['numTxACK']-2) * 256
+                        dict_data['lowestRank'].append(dict_line['DAGrank']+rankIncrease)
+                    else:
+                        if len(dict_data['lowestRank'])>0:
+                            # add the previous lowest rank for scale the list matching the scale of time
+                            dict_data['lowestRank'].append(dict_data['lowestRank'][-1])
+                if 'numTicsTotal' in dict_line:
+                    dict_data['dc'] = float(dict_line['numTicsOn'])/float(dict_line['numTicsTotal'])
+                if ('errcode' in dict_line) and dict_line['errcode']==28:
+                    dict_data['tc'].append(np.int16(dict_line['arg1']))
+                if ('slotOffset' in dict_line):
+                    if dict_line['type'] == CELLTYPE_TX:
+                        cell_installed = True
         
-    return count
+        with printLock:
+            print "gathering data from file {0} Done!".format(logfile)
+        
+        return dict_data
+        
+    except Exception as err:
+        print traceback.print_exc()
+        
+#============================ main ============================================
+def analyzeFiles(params):
+    cpuid = params
+    all_data = {}
+    try:
+        for filename in os.listdir(LOGFILE_PATH):
+            if filename.endswith('.parsed') and int(filename[8])%4==cpuid:
+                figure_identifier = filename.split('.')[0]
+                # analyzeOneFile_rank_parent_txcell_vs_time(LOGFILE_PATH+filename,cpuid,figure_identifier)
+                all_data[filename.split('.')[0]] = {}
+                all_data[filename.split('.')[0]] = analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(LOGFILE_PATH+filename,cpuid,figure_identifier)
+        return all_data
+    except Exception as err:
+        print traceback.print_exc()
+
+def main():
+    multiprocessing.freeze_support()
+    num_cpus = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(num_cpus)
+    data_result = pool.map_async(analyzeFiles,[i for i in range(num_cpus)])
+    while not data_result.ready():
+        time.sleep(1)
+    result = data_result.get()
+    
+    # collection all data in dict_all_data
+    dict_all_data = {}
+    for task_data in result:
+        dict_all_data.update(task_data)
+    
+    # generate rank vs node 
+    dict_node_rank_median = []
+    for node, content in dict_all_data.items():
+        dict_node_rank_median.append((np.median(content['lowestRank']),node))
+    dict_node_rank_median = sorted(dict_node_rank_median)
+    
+    # generate rank list
+    rank_statistic      = []
+    tc_statistic        = []
+    sync_time           = []
+    cell_install_delay  = []
+    duty_cycle          = []
+    num_nodes           = []
+    nodes_label         = []
+    for (median, node) in dict_node_rank_median:
+        if node == 'node-a8-2':
+            print "pass dagroot {0}".format(node)
+            continue
+        rank_statistic.append(dict_all_data[node]['lowestRank'])
+        tc_statistic.append(dict_all_data[node]['tc'])
+        nodes_label.append('{0} {1}'.format(node.split('-')[0],node.split('-')[-1]))
+        sync_time.append(dict_all_data[node]['sync_time'])
+        cell_install_delay.append(dict_all_data[node]['cell_install_delay'])
+        duty_cycle.append(dict_all_data[node]['dc'])
+        num_nodes.append(len(sync_time))
+        
+    # rank distribution 
+    fig, ax = plt.subplots(figsize=(32,20))
+    ax.boxplot(rank_statistic)
+    ax.set_xticklabels(nodes_label, rotation=45)
+    ax.set_xlabel('nodes')
+    ax.set_ylabel('rank')
+    plt.savefig('performance/statistic_rank.png')
+    plt.clf()
+    
+    # time correction distribution
+    fig, ax = plt.subplots(figsize=(32,20))
+    ax.boxplot(tc_statistic)
+    ax.set_xticklabels(nodes_label, rotation=45)
+    ax.set_xlabel('nodes')
+    ax.set_ylabel('time correction (ticks)')
+    plt.savefig('performance/statistic_tc.png')
+    plt.clf()
+    
+    # sync time
+    fig, ax = plt.subplots()
+    ax.plot(sorted(sync_time),num_nodes,'-^')
+    ax.set_xlabel('time (seconds)')
+    ax.set_ylabel('num_sync_nodes')
+    plt.savefig('performance/sync_time.png')
+    plt.clf()
+    
+    # cell install delay
+    fig, ax = plt.subplots()
+    ax.plot(sorted(cell_install_delay),num_nodes,'-^')
+    ax.set_xlabel('time (seconds)')
+    ax.set_ylabel('num_nodes_having_txcell')
+    plt.savefig('performance/cell_install_delay.png')
+    plt.clf()
+    
+    # duty cycle
+    fig, ax = plt.subplots(figsize=(32,20))
+    ax.plot(duty_cycle,'-')
+    ax.set_xticks([i for i in range(len(nodes_label))])
+    ax.set_xticklabels(nodes_label, rotation=45)
+    ax.set_xlabel('nodes')
+    ax.set_ylabel('duty_cycle')
+    ax.set_ylim(0,0.1)
+    plt.savefig('performance/duty_cycle.png')
+    plt.clf()
+    raw_input()
         
 if __name__ == "__main__":
     main()
