@@ -192,7 +192,7 @@ def parse_STATUS(frame):
     elif header['type']==9: # NeighborsRow
         payload = parseHeader(
             frame[3:],
-            '<BBBBBBBQQHbBBBBBHHBBBB',
+            '<BBBBBBBQQHbBBBBBHHBBBBB',
             (
                 'row',                       # B
                 'used',                      # B
@@ -214,8 +214,9 @@ def parse_STATUS(frame):
                 'asn_0_1',                   # H
                 'joinPrio',                  # B
                 'f6PNORES',                  # B
-                'sixtopGEN',                 # B
                 'sixtopSeqNum',              # B
+                'backoffExponent',           # B
+                'backoff',                   # B
             ),
         )
     else:
