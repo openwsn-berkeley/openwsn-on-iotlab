@@ -21,6 +21,10 @@ ADDR_64B            = 2
 PARENTPREFERENCE    = 1
 DAGROOT             = 'node-a8-2'
 
+# figure_size     = (32,20)   # large
+# figure_size     = (8,6)     # default
+figure_size     = (12,8)
+
 #============================ functions =======================================
 def analyzeOneFile_rank_parent_txcell_vs_time(logfile, cpuid, figure_identifier):
     
@@ -83,7 +87,7 @@ def analyzeOneFile_rank_parent_txcell_vs_time(logfile, cpuid, figure_identifier)
 def analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(logfile, cpuid, figure_identifier):
     
     try:
-        dict_data = {'sync_time':0, 'lowestRank':[], 'dc': 0, 'tc':[], 'cell_install_delay': []}
+        dict_data = {'sync_time':0, 'lowestRank':[], 'dc': 0, 'tc':[], 'cell_install_delay': [], 'dedicated_cells': {}}
         synced         = False
         cell_installed = False
         with open(logfile,'r') as file:
@@ -114,6 +118,7 @@ def analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(logfile, cpuid, figure_i
                 if ('slotOffset' in dict_line):
                     if dict_line['type'] == CELLTYPE_TXRX and dict_line['neighbor_type'] == ADDR_64B:
                         cell_installed = True
+                        dict_data['dedicated_cells'].update({dict_line['row']:dict_line['slotOffset']})
         
         with printLock:
             print "gathering data from file {0} Done!".format(logfile)
@@ -165,6 +170,7 @@ def main():
     cell_install_delay  = []
     duty_cycle          = []
     num_nodes           = []
+    num_dedicated_cells = []
     nodes_label         = []
     for (median, node) in dict_node_rank_median:
         if node == DAGROOT:
@@ -177,9 +183,10 @@ def main():
         cell_install_delay.append(dict_all_data[node]['cell_install_delay'])
         duty_cycle.append(dict_all_data[node]['dc'])
         num_nodes.append(len(sync_time))
+        num_dedicated_cells.append(len(dict_all_data[node]['dedicated_cells']))
         
     # rank distribution 
-    fig, ax = plt.subplots(figsize=(32,20))
+    fig, ax = plt.subplots(figsize=figure_size)
     ax.boxplot(rank_statistic)
     ax.set_xticklabels(nodes_label, rotation=45)
     ax.set_xlabel('nodes')
@@ -188,7 +195,7 @@ def main():
     plt.clf()
     
     # time correction distribution
-    fig, ax = plt.subplots(figsize=(32,20))
+    fig, ax = plt.subplots(figsize=figure_size)
     ax.boxplot(tc_statistic)
     ax.set_xticklabels(nodes_label, rotation=45)
     ax.set_xlabel('nodes')
@@ -213,14 +220,22 @@ def main():
     plt.clf()
     
     # duty cycle
-    fig, ax = plt.subplots(figsize=(32,20))
-    ax.plot(duty_cycle,'-')
-    ax.set_xticks([i for i in range(len(nodes_label))])
-    ax.set_xticklabels(nodes_label, rotation=45)
-    ax.set_xlabel('nodes')
-    ax.set_ylabel('duty_cycle')
-    ax.set_ylim(0,0.1)
-    plt.savefig('performance/duty_cycle.png')
+    fig, ax1 = plt.subplots(figsize=figure_size)
+    ax1.plot(duty_cycle,'r-',label='duty_cycle')
+    ax1.set_xticks([i for i in range(len(nodes_label))])
+    ax1.set_xticklabels(nodes_label, rotation=45)
+    ax1.set_xlabel('nodes')
+    ax1.set_ylabel('duty_cycle',color='r')
+    ax1.set_ylim(0,0.1)
+    ax1.tick_params('y', colors='r')
+    
+    ax2 = ax1.twinx()
+    ax2.plot(num_dedicated_cells,'b-',label='num_dedicated_cells')
+    ax2.set_ylabel('num_dedicated_cells',color='b')
+    ax2.set_ylim(-1,20)
+    ax2.tick_params('y', colors='b')
+    
+    plt.savefig('performance/duty_cycle_num_dedicated_cells.png')
     plt.clf()
     raw_input()
         
