@@ -13,7 +13,13 @@ import numpy as np
 printLock = threading.Lock()
 LOGFILE_PATH = 'nodeoutput/'
 # LOGFILE_PATH = 'node_test/'
-CELLTYPE_TX  = 1
+CELLTYPE_TX         = 1
+CELLTYPE_TXRX       = 3
+
+ADDR_64B            = 2
+
+PARENTPREFERENCE    = 1
+DAGROOT             = 'node-a8-2'
 
 #============================ functions =======================================
 def analyzeOneFile_rank_parent_txcell_vs_time(logfile, cpuid, figure_identifier):
@@ -32,7 +38,7 @@ def analyzeOneFile_rank_parent_txcell_vs_time(logfile, cpuid, figure_identifier)
                         if dict_line['row'] in dict_rank_parent_txcell_vs_asn['parent']:
                             del dict_rank_parent_txcell_vs_asn['parent'][dict_line['row']]
                     dict_rank_parent_txcell_vs_asn['num_parents'].append(len(dict_rank_parent_txcell_vs_asn['parent']))
-                    if (dict_line['parentPreference'] == 2):
+                    if (dict_line['parentPreference'] == PARENTPREFERENCE):
                         if dict_line['numTxACK'] == 0:
                             rankIncrease = (3*16-2) * 256
                         else:
@@ -91,7 +97,7 @@ def analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(logfile, cpuid, figure_i
                 if ('isSync' in dict_line) and dict_line['isSync'] == 1:
                     synced = True
                 if ('addr_bodyH' in dict_line):
-                    if (dict_line['parentPreference'] == 2):
+                    if (dict_line['parentPreference'] == PARENTPREFERENCE):
                         if dict_line['numTxACK'] == 0:
                             rankIncrease = (3*16-2) * 256
                         else:
@@ -106,7 +112,7 @@ def analyzeOneFile_syncTime_rank_dc_tc_cellInstallDelay(logfile, cpuid, figure_i
                 if ('errcode' in dict_line) and dict_line['errcode']==28:
                     dict_data['tc'].append(np.int16(dict_line['arg1']))
                 if ('slotOffset' in dict_line):
-                    if dict_line['type'] == CELLTYPE_TX:
+                    if dict_line['type'] == CELLTYPE_TXRX and dict_line['neighbor_type'] == ADDR_64B:
                         cell_installed = True
         
         with printLock:
@@ -161,7 +167,7 @@ def main():
     num_nodes           = []
     nodes_label         = []
     for (median, node) in dict_node_rank_median:
-        if node == 'node-a8-2':
+        if node == DAGROOT:
             print "pass dagroot {0}".format(node)
             continue
         rank_statistic.append(dict_all_data[node]['lowestRank'])
@@ -202,7 +208,7 @@ def main():
     fig, ax = plt.subplots()
     ax.plot(sorted(cell_install_delay),num_nodes,'-^')
     ax.set_xlabel('time (seconds)')
-    ax.set_ylabel('num_nodes_having_txcell')
+    ax.set_ylabel('num_nodes_having_dedicated_cell')
     plt.savefig('performance/cell_install_delay.png')
     plt.clf()
     
