@@ -80,7 +80,9 @@ if __name__ == "__main__":
 #============================ parser function =================================
 
 def parse_DATA(frame):
-    return {}
+    header     = parseHeader(frame[:7],'<HHHB',('src','asn_0_1','asn_2_3','asn_4'))
+    payload    = {'data': str([byte for byte in frame[7:]])}
+    return payload
     
 def parse_STATUS(frame):
     header     = parseHeader(frame[:3],'<HB',('src','type'))
@@ -192,7 +194,7 @@ def parse_STATUS(frame):
     elif header['type']==9: # NeighborsRow
         payload = parseHeader(
             frame[3:],
-            '<BBBBBBBQQHbBBBBBHHBBBBB',
+            '<BBBBBBBQQHbBBBBBHHBBBBBB',
             (
                 'row',                       # B
                 'used',                      # B
@@ -214,6 +216,7 @@ def parse_STATUS(frame):
                 'asn_0_1',                   # H
                 'joinPrio',                  # B
                 'f6PNORES',                  # B
+                'inBlacklist',               # B
                 'sixtopSeqNum',              # B
                 'backoffExponent',           # B
                 'backoff',                   # B
